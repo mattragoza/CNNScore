@@ -1,5 +1,5 @@
 import sys
-from sys import getsizeof as sizeof
+import os
 import numpy
 import csv
 import lmdb
@@ -17,17 +17,24 @@ KNOWN_FORMATS = {
 }
 
 USAGE_STRING = {
-	"general":"\
-Usage: python cnnscore.py <command> [<args>]\n\
-\n\
-    Commands:\n\
-        make_lmdb <csv file> <csv format>\n",
+	"general":"""\
+Usage: python cnnscore.py <command> [<args>]
 
-	"make_lmdb":"\
-Usage: python cnnscore.py make_lmdb <csv file> <csv format>\n\
-\n\
-    Known CSV formats:\n\
-        DUDE_SCOREDATA\n"
+    Commands:
+        lmdb\tConvert a csv database to lmdb format
+        train\tTrain a network using Caffe
+	""",
+
+	"lmdb":"""\
+Usage: python cnnscore.py lmdb <csv file> <csv format>
+
+    Known CSV formats:
+        DUDE_SCOREDATA
+	""",
+
+	"train":"""\
+Usage: python cnnscore.py train <solver prototxt>
+	"""
 }
 
 
@@ -57,12 +64,18 @@ class Database:
 		
 		self.nbytes = sum([i._data.nbytes for i in self._data])
 
-	def write_lmdb(self, mmap):
+	def write_lmdb(self, data_map, label_map):
 
-		with mmap.begin(write=True) as txn:
+		with data_map.begin(write=True) as txn:
 
 			for s in self._data:
 				datum = caffe.io.array_to_datum(s._data)
+				txn.put(key=s._id.encode("ascii"), value=datum.SerializeToString())
+
+		with label_map.begin(write=True) as txn:
+
+			for s in self._data:
+				datum = caffe.io.array_to_datum(s._label)
 				txn.put(key=s._id.encode("ascii"), value=datum.SerializeToString())
 
 
@@ -88,11 +101,11 @@ if __name__ == "__main__":
 		sys.exit(1)
 
 	command_arg = sys.argv[1]
-	if command_arg == "make_lmdb":
+	if command_arg == "lmdb":
 
 		if len(sys.argv) < 4:
 
-			print(USAGE_STRING["make_lmdb"])
+			print(USAGE_STRING["lmdb"])
 			sys.exit(1)
 
 		file_arg = sys.argv[2]
@@ -107,14 +120,28 @@ if __name__ == "__main__":
 		db.read_csv(file=input_file, _format=format_arg)
 		input_file.close()
 
-		try: lmdb_map = lmdb.open(file_arg+".lmdb", map_size=db.nbytes*2)
+		try: 
+			data_lmdb  = lmdb.open(file_arg+".data.lmdb",  map_size=db.nbytes*2)
+			label_lmdb = lmdb.open(file_arg+".label.lmdb", map_size=db.nbytes*2)
 		except IOError:
 			print("Error: could not open lmdb environment")
 			sys.exit(1)
 		print("Converting to lmdb format")
-		db.write_lmdb(mmap=lmdb_map)
-		lmdb_map.close()
+		db.write_lmdb(data_lmdb, label_lmdb)
+		data_lmdb.close()
+		label_lmdb.close()
 		print("Done.")
+
+	elif command_arg == "train":
+
+		if len(sys.argv) < 3:
+
+			print(USAGE_STRING["train"])
+			sys.exit(1)
+
+		solver_arg = sys.argv[2]
+		train_command = "$CAFFE_ROOT/build/tools/caffe train --solver=" + solver_arg 
+		os.system(train_command)
 
 	else:
 
