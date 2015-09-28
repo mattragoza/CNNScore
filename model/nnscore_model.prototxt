@@ -1,32 +1,58 @@
 name: "NNScore"
 
 layer {
-  name: "data"
+  name: "data_layer"
   type: "Data"
-  top: "data"
+  top: "data_blob"
   data_param {
-    source: "DUDe/SCOREDATA.vina.reduced.data.lmdb"
-    batch_size: 64
+    source: "DUDe/lmdb/SCOREDATA.vina.reduced.0.train.data.lmdb"
+    batch_size: 1000
     backend: LMDB
   }
+  include: { phase: TRAIN }
 }
 
 layer {
-  name: "label"
+  name: "label_layer"
   type: "Data"
-  top: "label"
+  top: "label_blob"
   data_param {
-    source: "DUDe/SCOREDATA.vina.reduced.label.lmdb"
-    batch_size: 64
+    source: "DUDe/lmdb/SCOREDATA.vina.reduced.0.train.label.lmdb"
+    batch_size: 1000
     backend: LMDB
   }
+  include: { phase: TRAIN }
 }
 
 layer {
-  name: "hidden_sum"
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  data_param {
+    source: "DUDe/lmdb/SCOREDATA.vina.reduced.0.test.data.lmdb"
+    batch_size: 1000
+    backend: LMDB
+  }
+  include: { phase: TEST }
+}
+
+layer {
+  name: "label_layer"
+  type: "Data"
+  top: "label_blob"
+  data_param {
+    source: "DUDe/lmdb/SCOREDATA.vina.reduced.0.test.label.lmdb"
+    batch_size: 1000
+    backend: LMDB
+  }
+  include: { phase: TEST }
+}
+
+layer {
+  name: "hidden_sum_layer"
   type: "InnerProduct"
-  bottom: "data"
-  top: "hidden_sum"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
 
   inner_product_param {
     num_output: 10
@@ -39,17 +65,17 @@ layer {
   }
 }
 layer {
-  name: "hidden_act"
+  name: "hidden_act_layer"
   type: "Sigmoid"
-  bottom: "hidden_sum"
-  top: "hidden_act"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
 }
 
 layer {
-  name: "output_sum"
+  name: "output_sum_layer"
   type: "InnerProduct"
-  bottom: "hidden_act"
-  top: "output_sum"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
 
   inner_product_param {
     num_output: 1
@@ -62,16 +88,16 @@ layer {
   }
 }
 layer {
-  name: "output_act"
+  name: "output_act_layer"
   type: "Sigmoid"
-  bottom: "output_sum"
-  top: "output_act"
+  bottom: "output_sum_blob"
+  top: "output_act_blob"
 }
 
 layer {
-  name: "error"
+  name: "error_layer"
   type: "EuclideanLoss"
-  bottom: "output_act"
-  bottom: "label"
-  top: "error"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
 }
