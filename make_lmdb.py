@@ -24,34 +24,27 @@ CSV_FORMATS = {
     }
 }
 
-USAGE = "python make_lmdb.py <file> <format> <partitions> <dir>\n"
+USAGE = "python make_lmdb.py <input> <format> <partitions> <output>\n"
 
 
 
 class Database:
 
-	def __init__(self):
+	def __init__(self, file_=None, format_=None):
 
-		self._source = None
-		self._format = None
-		self._samples = []
-		self._groups = set()
+		if file_ is not None and format_ is not None:
+			self.read_csv()
 
-		self._nparts = 0
-		self._parts = []
-		self._by = None
+		else:
+			self._source = None
+			self._format = None
 
-		self._nbytes = 0
+			self._samples = []
+			self._groups  = {}
+			self._parts = []
 
+			self._nbytes = 0
 
-	def __repr__(self):
-
-		s = "source: " + self._source + "\n" + \
-		    "samples: " + str(len(self._samples)) + "\n" + \
-		    "groups: " + str(len(self._groups)) + "\n" + \
-		    "partitions: " + str(self._nparts) + "\n" + \
-		    "bytes: " + str(self._nbytes) + "\n"
-		return s
 
 	def read_csv(self, file_, format_):
 
@@ -59,10 +52,11 @@ class Database:
 		csv_file   = open(file_, "r")
 		csv_format = CSV_FORMATS[format_]
 		csv_reader = csv.reader(csv_file, delimiter=csv_format["delimiter"])
+		print(csv_format)
 
-		self.empty()
 		self._source = file_
 		self._format = csv_format
+		self._parts = []
 		# create a Database.Sample() object for each row in the csv_file
 		# also keep track of all groups present in the data in a set()
 		for row in csv_reader:
@@ -70,12 +64,18 @@ class Database:
 				               [row[i] for i in csv_format["data"]],
 				               [row[i] for i in csv_format["label"]])
 			self._samples.append(s)
-			self._groups.add(s._group)
+
+			if s._group in self._groups:
+				self._groups[s._group].append(s)
+			else:
+				print(s._group)
+				self._groups[s._group] = [s]
 		
 		# get a *rough* estimate of the number of bytes of data by summing the numpy.array() bytes
 		self._nbytes = 8 * (len(self._format["data"]) + len(self._format["label"])) * len(self._samples)
+		print(str(self._nbytes) + " bytes read")
 		csv_file.close()
-		return self
+
 
 	def write_lmdb(self, dir_):
 
@@ -121,48 +121,32 @@ class Database:
 			test_data_lmdb.close()
 			test_label_lmdb.close()
 	
-	def make_partitions(self, num, by_group):
+	def balanced_partition(self, n):
 
-		# for by_group, we divide the database's groups into num partitons, where in each one
-		# we use 1/num of the groups' samples as the test set and the rest as the training set
-		if by_group:
+		# sort the groups in a list based on number of samples
+		sorted_groups = [(g, len(self._groups[g])) for g in self._groups]
+		sorted_groups.sort(key=lambda tup: tup[1], reverse=True)
 
-			# randomly shuffle the order of the groups in a list
-			groups = list(self._groups)
-			random.shuffle(groups)
+		index = 0
+		forward = True
+		folds = [[] for i in range(n)]
+		for g in sorted_groups:
+			folds[index].append(g[0])
+			if forward:
+				if index < len(self._groups):
+					index += 1
+				else:
+					forward = False
+			else:
+				if index > 0:
+					index -= 1
+				else:
+					forward = True
 
-			# iterate through the groups in steps of size #groups/#partitions
-			self._parts = []
-			p = int(len(groups)/num)
-			for i in range(0, len(groups), p):
-
-				# use the current step as the test set and the rest as the training set in a partition
-				train  = groups[0:i] + groups[i+p:]
-				test = groups[i:i+p]
-				self._parts.append(Database.Partition(self, train, test))
-
-			self._nparts = num
-			self._by = "_group"
-
-		else: # TODO should have this even though we're probably not using it
-
-			self.unpartition()
-			print("TODO")
-
-	def unpartition(self):
-
-		self._parts = []
-		self._nparts = 0
-		self._by = None
-
-	def empty(self):
-
-		self.unpartition()
-		self._groups = set()
-		self._samples = []
-		self._nbytes = 0
-		self._source = None
-
+		for i in range(n):
+			test_set = folds.[i]
+			train_set = folds[:i] + folds[i+1:]
+			self._parts = Database.Partition(self, train_set, test_set)
 
 
 	class Partition:
@@ -176,15 +160,14 @@ class Database:
 		def train_set(self):
 
 			for s in self._db._samples:
-				if getattr(s, self._db._by) in self._train_set:
+				if s._group in self._train_set:
 					yield s
 
 		def test_set(self):
 
 			for s in self._db._samples:
-				if getattr(s, self._db._by) in self._test_set:
+				if s._group in self._test_set:
 					yield s
-
 
 
 	class Sample:
@@ -198,32 +181,24 @@ class Database:
 			for i in range(len(db._format["data"])):  self._data[i, 0, 0]  = data[i]
 			for i in range(len(db._format["label"])): self._label[i, 0, 0] = label[i]
 
-		def __repr__(self):
-
-			s = "id: " + str(self._id) + "\n" + \
-				"group: " + str(self._group) + "\n" + \
-				"data: " + str(self._data.shape) + "\n" + \
-				"label: " + str(self._label.shape) + "\n"
-			return s
 
 
 
 
 if __name__ == "__main__":
 
-	usage_format = USAGE[7:-1].split()
+	usage_format = USAGE.strip("\n").split()[1:]
 	if len(sys.argv) < len(usage_format):
 		print("Usage: " + USAGE)
 		sys.exit(1)
 
-	file_arg   = sys.argv[usage_format.index("<file>")]
+	file_arg   = sys.argv[usage_format.index("<input>")]
 	format_arg = sys.argv[usage_format.index("<format>")]
 	parts_arg  = sys.argv[usage_format.index("<partitions>")]
-	output_arg = sys.argv[usage_format.index("<dir>")]
+	output_arg = sys.argv[usage_format.index("<output>")]
 
-	db = Database()
 	print("Gathering data from " + file_arg)
-	try: db.read_csv(file_arg, format_arg)
+	try: db = Database(file_arg, format_arg)
 	except IOError:
 		print("Error: could not access the input file")
 		sys.exit(1)
@@ -232,7 +207,7 @@ if __name__ == "__main__":
 		sys.exit(1)
 
 	print("Generating " + parts_arg + " partitions")
-	db.make_partitions(num=int(parts_arg), by_group=True)
+	db.balanced_partition(num=int(parts_arg))
 
 	print("Converting to lmdb format in " + output_arg)
 	try: db.write_lmdb(output_arg)
