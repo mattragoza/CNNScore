@@ -33,7 +33,7 @@ class Database:
 	def __init__(self, file_=None, format_=None):
 
 		if file_ is not None and format_ is not None:
-			self.read_csv()
+			self.read_csv(file_, format_)
 
 		else:
 			self._source = None
@@ -43,7 +43,7 @@ class Database:
 			self._groups  = {}
 			self._parts = []
 
-			self._nbytes = 0
+			self.nbytes = 0
 
 
 	def read_csv(self, file_, format_):
@@ -52,10 +52,11 @@ class Database:
 		csv_file   = open(file_, "r")
 		csv_format = CSV_FORMATS[format_]
 		csv_reader = csv.reader(csv_file, delimiter=csv_format["delimiter"])
-		print(csv_format)
 
 		self._source = file_
 		self._format = csv_format
+		self._samples = []
+		self._groups = {}
 		self._parts = []
 		# create a Database.Sample() object for each row in the csv_file
 		# also keep track of all groups present in the data in a set()
@@ -68,58 +69,54 @@ class Database:
 			if s._group in self._groups:
 				self._groups[s._group].append(s)
 			else:
-				print(s._group)
 				self._groups[s._group] = [s]
 		
 		# get a *rough* estimate of the number of bytes of data by summing the numpy.array() bytes
-		self._nbytes = 8 * (len(self._format["data"]) + len(self._format["label"])) * len(self._samples)
-		print(str(self._nbytes) + " bytes read")
+		self.nbytes = 8 * (len(self._format["data"]) + len(self._format["label"])) * len(self._samples)
 		csv_file.close()
 
 
 	def write_lmdb(self, dir_):
 
 		# for each partition in the database
-		for i in range(self._nparts):
+		for i in range(len(self._parts)):
 
 			partition  = self._parts[i]
 			source_file = os.path.basename(self._source)
 
-			# we need to create 4 lmdbs- training data, training label, test data, and test label
-			train_data_path  = os.path.join(dir_, source_file+"."+str(i)+".train.data")
-			train_label_path = os.path.join(dir_, source_file+"."+str(i)+".train.label")
-			test_data_path   = os.path.join(dir_, source_file+"."+str(i)+".test.data")
-			test_label_path  = os.path.join(dir_, source_file+"."+str(i)+".test.label")
+			# we need to create train and test lmdbs
+			train_path = os.path.join(dir_, source_file+"."+str(i)+".train")
+			test_path  = os.path.join(dir_, source_file+"."+str(i)+".test")
 			
 			# open the memory mapped environment associated with each lmdb
-			train_data_lmdb  = lmdb.open(train_data_path,  map_size=2*self._nbytes)
-			train_label_lmdb = lmdb.open(train_label_path, map_size=2*self._nbytes)
-			test_data_lmdb   = lmdb.open(test_data_path,   map_size=2*self._nbytes)
-			test_label_lmdb  = lmdb.open(test_label_path,  map_size=2*self._nbytes)
+			train_lmdb = lmdb.open(train_data_path,  map_size=2*self.nbytes)
+			test_lmdb  = lmdb.open(test_data_path,   map_size=2*self.nbytes)
 
 			# writing training set data and labels
-			with train_data_lmdb.begin(write=True) as data_txn:
-				with train_label_lmdb.begin(write=True) as label_txn:
-					for s in partition.train_set():
-						data_datum  = caffe.io.array_to_datum(s._data)
-						label_datum = caffe.io.array_to_datum(s._label)
-						data_txn.put(key=s._id.encode("ascii"), value=data_datum.SerializeToString())
-						label_txn.put(key=s._id.encode("ascii"), value=label_datum.SerializeToString())
+			with train_lmdb.begin(write=True) as txn:
+				for s in partition.train_set():
+					datum = caffe.proto.caffe_pb2.Datum()
+					datum.channels = len(self._format["data"])
+					datum.height = 1
+					datum.width  = 1
+					datum.float_data = s._data.tobytes()
+					datum.label = int(s._label[0])
+					txn.put(key=s._id.encode("ascii"), value=datum.SerializeToString())
 
 			# write test set data and labels
-			with test_data_lmdb.begin(write=True) as data_txn:
-				with test_label_lmdb.begin(write=True) as label_txn:
-					for s in partition.test_set():
-						data_datum  = caffe.io.array_to_datum(s._data)
-						label_datum = caffe.io.array_to_datum(s._label)
-						data_txn.put(key=s._id.encode("ascii"), value=data_datum.SerializeToString())
-						label_txn.put(key=s._id.encode("ascii"), value=label_datum.SerializeToString())
+			with test_lmdb.begin(write=True) as txn:
+				for s in partition.test_set():
+					datum = caffe.proto.caffe_pb2.Datum()
+					datum.channels = len(self._format["data"])
+					datum.height = 1
+					datum.width  = 1
+					datum.float_data = s._data.tobytes()
+					datum.label = int(s._label[0])
+					txn.put(key=s._id.encode("ascii"), value=datum.SerializeToString())
 
 			# close the lmdb environments
-			train_data_lmdb.close()
-			train_label_lmdb.close()
-			test_data_lmdb.close()
-			test_label_lmdb.close()
+			train_lmdb.close()
+			test_lmdb.close()
 	
 	def balanced_partition(self, n):
 
@@ -133,7 +130,7 @@ class Database:
 		for g in sorted_groups:
 			folds[index].append(g[0])
 			if forward:
-				if index < len(self._groups):
+				if index < n-1:
 					index += 1
 				else:
 					forward = False
@@ -144,9 +141,9 @@ class Database:
 					forward = True
 
 		for i in range(n):
-			test_set = folds.[i]
-			train_set = folds[:i] + folds[i+1:]
-			self._parts = Database.Partition(self, train_set, test_set)
+			test_set = folds[i]
+			train_set = [j for f in folds[:i] for j in f] + [j for f in folds[i+1:] for j in f]
+			self._parts.append(Database.Partition(self, train_set, test_set))
 
 
 	class Partition:
@@ -205,9 +202,10 @@ if __name__ == "__main__":
 	except KeyError:
 		print("Error: unknown input file format")
 		sys.exit(1)
+	print(str(db.nbytes) + " bytes read")
 
 	print("Generating " + parts_arg + " partitions")
-	db.balanced_partition(num=int(parts_arg))
+	db.balanced_partition(n=int(parts_arg))
 
 	print("Converting to lmdb format in " + output_arg)
 	try: db.write_lmdb(output_arg)

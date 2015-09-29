@@ -4,22 +4,12 @@ layer {
   name: "data_layer"
   type: "Data"
   top: "data_blob"
-  data_param {
-    source: "DUDe/lmdb/SCOREDATA.vina.reduced.0.train.data.lmdb"
-    batch_size: 1000
-    backend: LMDB
-  }
-  include: { phase: TRAIN }
-}
-
-layer {
-  name: "label_layer"
-  type: "Data"
   top: "label_blob"
   data_param {
-    source: "DUDe/lmdb/SCOREDATA.vina.reduced.0.train.label.lmdb"
+    source: "DUDe/lmdb/SCOREDATA.vina.reduced.0.train"
     batch_size: 1000
     backend: LMDB
+    shuffle: true
   }
   include: { phase: TRAIN }
 }
@@ -28,22 +18,12 @@ layer {
   name: "data_layer"
   type: "Data"
   top: "data_blob"
-  data_param {
-    source: "DUDe/lmdb/SCOREDATA.vina.reduced.0.test.data.lmdb"
-    batch_size: 1000
-    backend: LMDB
-  }
-  include: { phase: TEST }
-}
-
-layer {
-  name: "label_layer"
-  type: "Data"
   top: "label_blob"
   data_param {
-    source: "DUDe/lmdb/SCOREDATA.vina.reduced.0.test.label.lmdb"
+    source: "DUDe/lmdb/SCOREDATA.vina.reduced.0.test"
     batch_size: 1000
     backend: LMDB
+    shuffle: true
   }
   include: { phase: TEST }
 }
