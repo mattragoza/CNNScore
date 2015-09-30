@@ -12,19 +12,11 @@ CSV_FORMATS = {
         "id":2,
         "group":1,
         "data":list(range(4, 65)),
-        "label":[0]
+        "label":0
     },
-
-    "TEST_DATA": {
-    	"delimiter":',',
-    	"id":0,
-    	"group":1,
-    	"data":[2],
-    	"label":[3]
-    }
 }
 
-USAGE = "python make_lmdb.py <input> <format> <partitions> <output>\n"
+USAGE = "python make_lmdb.py <data>\n"
 
 
 
@@ -58,12 +50,12 @@ class Database:
 		self._samples = []
 		self._groups = {}
 		self._parts = []
+
 		# create a Database.Sample() object for each row in the csv_file
 		# also keep track of all groups present in the data in a set()
 		for row in csv_reader:
 			s = Database.Sample(self, row[csv_format["id"]], row[csv_format["group"]],
-				               [row[i] for i in csv_format["data"]],
-				               [row[i] for i in csv_format["label"]])
+				               [float(row[i]) for i in csv_format["data"]], int(row[csv_format["label"]]))
 			self._samples.append(s)
 
 			if s._group in self._groups:
@@ -71,8 +63,8 @@ class Database:
 			else:
 				self._groups[s._group] = [s]
 		
-		# get a *rough* estimate of the number of bytes of data by summing the numpy.array() bytes
-		self.nbytes = 8 * (len(self._format["data"]) + len(self._format["label"])) * len(self._samples)
+		# get a *rough* estimate of the number of bytes of data, assuming float64
+		self.nbytes = 8 * len(self._format["data"]) * len(self._samples)
 		csv_file.close()
 
 
@@ -89,8 +81,8 @@ class Database:
 			test_path  = os.path.join(dir_, source_file+"."+str(i)+".test")
 			
 			# open the memory mapped environment associated with each lmdb
-			train_lmdb = lmdb.open(train_data_path,  map_size=2*self.nbytes)
-			test_lmdb  = lmdb.open(test_data_path,   map_size=2*self.nbytes)
+			train_lmdb = lmdb.open(train_path,  map_size=4*self.nbytes)
+			test_lmdb  = lmdb.open(test_path,   map_size=4*self.nbytes)
 
 			# writing training set data and labels
 			with train_lmdb.begin(write=True) as txn:
@@ -99,8 +91,8 @@ class Database:
 					datum.channels = len(self._format["data"])
 					datum.height = 1
 					datum.width  = 1
-					datum.float_data = s._data.tobytes()
-					datum.label = int(s._label[0])
+					datum.float_data.extend(s._data);
+					datum.label = s._label
 					txn.put(key=s._id.encode("ascii"), value=datum.SerializeToString())
 
 			# write test set data and labels
@@ -110,8 +102,8 @@ class Database:
 					datum.channels = len(self._format["data"])
 					datum.height = 1
 					datum.width  = 1
-					datum.float_data = s._data.tobytes()
-					datum.label = int(s._label[0])
+					datum.float_data.extend(s._data);
+					datum.label = s._label
 					txn.put(key=s._id.encode("ascii"), value=datum.SerializeToString())
 
 			# close the lmdb environments
@@ -173,10 +165,9 @@ class Database:
 
 			self._id    = id_
 			self._group = group
-			self._data  = numpy.empty((len(db._format["data"]), 1, 1),  dtype=numpy.float64)
-			self._label = numpy.empty((len(db._format["label"]), 1, 1), dtype=numpy.float64)
-			for i in range(len(db._format["data"])):  self._data[i, 0, 0]  = data[i]
-			for i in range(len(db._format["label"])): self._label[i, 0, 0] = label[i]
+			self._data  = data
+			self._label = label
+
 
 
 
@@ -189,13 +180,10 @@ if __name__ == "__main__":
 		print("Usage: " + USAGE)
 		sys.exit(1)
 
-	file_arg   = sys.argv[usage_format.index("<input>")]
-	format_arg = sys.argv[usage_format.index("<format>")]
-	parts_arg  = sys.argv[usage_format.index("<partitions>")]
-	output_arg = sys.argv[usage_format.index("<output>")]
+	file_arg   = sys.argv[usage_format.index("<data>")]
 
 	print("Gathering data from " + file_arg)
-	try: db = Database(file_arg, format_arg)
+	try: db = Database(file_arg, "DUDE_SCOREDATA")
 	except IOError:
 		print("Error: could not access the input file")
 		sys.exit(1)
@@ -204,11 +192,11 @@ if __name__ == "__main__":
 		sys.exit(1)
 	print(str(db.nbytes) + " bytes read")
 
-	print("Generating " + parts_arg + " partitions")
-	db.balanced_partition(n=int(parts_arg))
+	print("Generating balanced partitions")
+	db.balanced_partition(n=10)
 
-	print("Converting to lmdb format in " + output_arg)
-	try: db.write_lmdb(output_arg)
+	print("Converting to lmdb format")
+	try: db.write_lmdb("lmdb/")
 	except IOError:
 		print("Error: could not access the output location")
 		sys.exit(1)
