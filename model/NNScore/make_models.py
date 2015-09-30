@@ -1,5 +1,5 @@
 MODEL = ["""\
-name: \"""", "nnscore_model_0.prototxt", """\"
+name: \"""", "<name>", """\"
 
 layer {
   name: "data_layer"
@@ -7,10 +7,9 @@ layer {
   top: "data_blob"
   top: "label_blob"
   data_param {
-    source: \"""", "lmdb/DUDe/SCOREDATA.vina.balanced.0.train", """\"
+    source: \"""", "<train>", """\"
     batch_size: 1000
     backend: LMDB
-    shuffle: true
   }
   include: { phase: TRAIN }
 }
@@ -21,10 +20,9 @@ layer {
   top: "data_blob"
   top: "label_blob"
   data_param {
-    source: \"""", "lmdb/DUDe/SCOREDATA.vina.balanced.0.test", """\"
+    source: \"""", "<test>", """\"
     batch_size: 1000
     backend: LMDB
-    shuffle: true
   }
   include: { phase: TEST }
 }
@@ -88,9 +86,9 @@ if __name__ == "__main__":
 	for i in range(10):
 
 		name = "nnscore_model_" + str(i) + ".prototxt"
-		train_data = "lmdb/DUDe/SCOREDATA.vina.balanced." + str(i) + ".train"
-		test_data = "lmdb/DUDe/SCOREDATA.vina.balanced." + str(i) + ".test"
-		model = MODEL[0] + name + MODEL[2] + train_data + MODEL[4] + test_data + MODEL[6]
+		train = "lmdb/SCOREDATA.vina.balanced." + str(i) + ".train"
+		test = "lmdb/SCOREDATA.vina.balanced." + str(i) + ".test"
+		model = MODEL[0] + name + MODEL[2] + train + MODEL[4] + test + MODEL[6]
 
 		model_file = open(name, "w")
 		model_file.write(model)

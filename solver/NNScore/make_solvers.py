@@ -1,5 +1,5 @@
 SOLVER = ["""\
-net: """, "\"model/NNScore/nnscore_model_0.prototxt\"", """
+net: \"""", "model/NNScore/nnscore_model_0.prototxt", """\"
 
 test_iter: 1000
 test_interval: 5000
