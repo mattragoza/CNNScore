@@ -8,8 +8,9 @@ layer {
   top: "label_blob"
   data_param {
     source: \"""", "<train>", """\"
-    batch_size: 1000
+    batch_size: 20000
     backend: LMDB
+    prefetch: 8
   }
   include: { phase: TRAIN }
 }
@@ -21,8 +22,9 @@ layer {
   top: "label_blob"
   data_param {
     source: \"""", "<test>", """\"
-    batch_size: 1000
+    batch_size: 2000
     backend: LMDB
+    prefetch: 8
   }
   include: { phase: TEST }
 }
@@ -85,7 +87,7 @@ if __name__ == "__main__":
 
 	for i in range(10):
 
-		name = "nnscore_model_" + str(i) + ".prototxt"
+		name = "model/NNScore/nnscore_model_" + str(i) + ".prototxt"
 		train = "lmdb/SCOREDATA.vina.balanced." + str(i) + ".train"
 		test = "lmdb/SCOREDATA.vina.balanced." + str(i) + ".test"
 		model = MODEL[0] + name + MODEL[2] + train + MODEL[4] + test + MODEL[6]
