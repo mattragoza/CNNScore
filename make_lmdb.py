@@ -16,7 +16,7 @@ CSV_FORMATS = {
     },
 }
 
-USAGE = "python make_lmdb.py <data>\n"
+USAGE = "python make_lmdb.py <data>"
 
 
 
