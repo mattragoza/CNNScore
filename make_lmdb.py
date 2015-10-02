@@ -1,6 +1,5 @@
 import sys
 import os
-import numpy
 import csv
 import lmdb
 import caffe
@@ -70,15 +69,30 @@ class Database:
 
 	def write_lmdb(self, dir_):
 
+		# write the entire database
+		source_file = os.path.basename(self._source)
+		full_path = os.path.join(dir_, source_file+".full")
+		full_lmdb = lmdb.open(full_path, map_size=4*self.nbytes)
+		with full_lmdb.begin(write=True) as txn:
+			for s in self._samples:
+				c += 1
+				datum = caffe.proto.caffe_pb2.Datum()
+				datum.channels = len(self._format["data"])
+				datum.height = 1
+				datum.width  = 1
+				datum.float_data.extend(s._data);
+				datum.label = s._label
+				txn.put(key=s._id.encode("ascii"), value=datum.SerializeToString())
+		full_lmdb.close()
+
 		# for each partition in the database
 		for i in range(len(self._parts)):
 
 			partition  = self._parts[i]
-			source_file = os.path.basename(self._source)
 
 			# we need to create train and test lmdbs
-			train_path = os.path.join(dir_, source_file+"."+str(i)+".train")
-			test_path  = os.path.join(dir_, source_file+"."+str(i)+".test")
+			train_path = os.path.join(dir_, source_file+".part"+str(i)+".train")
+			test_path  = os.path.join(dir_, source_file+".part"+str(i)+".test")
 			
 			# open the memory mapped environment associated with each lmdb
 			train_lmdb = lmdb.open(train_path,  map_size=4*self.nbytes)
@@ -87,6 +101,7 @@ class Database:
 			# writing training set data and labels
 			with train_lmdb.begin(write=True) as txn:
 				for s in partition.train_set():
+					c += 1
 					datum = caffe.proto.caffe_pb2.Datum()
 					datum.channels = len(self._format["data"])
 					datum.height = 1
@@ -98,6 +113,7 @@ class Database:
 			# write test set data and labels
 			with test_lmdb.begin(write=True) as txn:
 				for s in partition.test_set():
+					c += 1
 					datum = caffe.proto.caffe_pb2.Datum()
 					datum.channels = len(self._format["data"])
 					datum.height = 1

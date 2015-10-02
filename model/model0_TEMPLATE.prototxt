@@ -1,13 +1,4 @@
-if __name__ == "__main__":
-
-	for i in range(10):
-
-		model_name = "model/NNScore/nnscore_model_"  + str(i) + ".prototxt"
-		train_lmdb = "lmdb/SCOREDATA.vina.balanced." + str(i) + ".train"
-		test_lmdb  = "lmdb/SCOREDATA.vina.balanced." + str(i) + ".test"
-
-		model = """\
-name: \""""+model_name+"""\"
+name: "$model_name"
 
 layer {
   name: "data_layer"
@@ -15,7 +6,7 @@ layer {
   top: "data_blob"
   top: "label_blob"
   data_param {
-    source: \""""+train_lmdb+"""\"
+    source: "$train_lmdb"
     batch_size: 20000
     backend: LMDB
     prefetch: 8
@@ -29,7 +20,7 @@ layer {
   top: "data_blob"
   top: "label_blob"
   data_param {
-    source: \""""+test_lmdb+"""\"
+    source: "$test_lmdb"
     batch_size: 2000
     backend: LMDB
     prefetch: 8
@@ -89,8 +80,4 @@ layer {
   bottom: "output_act_blob"
   bottom: "label_blob"
   top: "error_blob"
-}"""
-
-		model_file = open(model_name, "w")
-		model_file.write(model)
-		model_file.close()
+}
