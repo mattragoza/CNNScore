@@ -32,12 +32,15 @@ def write_prototxt(data_name, model_temp, solver_temp, output_dir, id_):
     model  = model_temp.contents.replace("$model_name", model_name, 1)
     solver = solver_temp.contents.replace("$model_name", model_name, 1)
 
-    if id_ == "full":
+    if id_ == "full": # train on entire set, no test phase
         full_lmdb = data_name+".full"
         model = model.replace("$train_lmdb", full_lmdb, 1)
         model = model.replace("$test_lmdb",  full_lmdb, 1)
 
-    else:
+    else: # cross-validation training and testing
+        model = model.replace("//", "") # uncomment lines relevant to testing
+        solver = solver.replace("//", "")
+
         train_lmdb = data_name+"."+id_+".train"
         test_lmdb  = data_name+"."+id_+".test"
         model = model.replace("$train_lmdb", train_lmdb, 1)

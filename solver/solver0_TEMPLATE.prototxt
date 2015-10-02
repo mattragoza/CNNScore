@@ -1,7 +1,7 @@
 net: "$model_name"
 
-test_iter: 100
-test_interval: 1000
+//test_iter: 100
+//test_interval: 1000
 
 base_lr: 0.01
 momentum: 0.9

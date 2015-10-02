@@ -75,7 +75,6 @@ class Database:
 		full_lmdb = lmdb.open(full_path, map_size=4*self.nbytes)
 		with full_lmdb.begin(write=True) as txn:
 			for s in self._samples:
-				c += 1
 				datum = caffe.proto.caffe_pb2.Datum()
 				datum.channels = len(self._format["data"])
 				datum.height = 1
@@ -101,7 +100,6 @@ class Database:
 			# writing training set data and labels
 			with train_lmdb.begin(write=True) as txn:
 				for s in partition.train_set():
-					c += 1
 					datum = caffe.proto.caffe_pb2.Datum()
 					datum.channels = len(self._format["data"])
 					datum.height = 1
@@ -113,7 +111,6 @@ class Database:
 			# write test set data and labels
 			with test_lmdb.begin(write=True) as txn:
 				for s in partition.test_set():
-					c += 1
 					datum = caffe.proto.caffe_pb2.Datum()
 					datum.channels = len(self._format["data"])
 					datum.height = 1

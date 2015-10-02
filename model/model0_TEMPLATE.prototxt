@@ -11,22 +11,22 @@ layer {
     backend: LMDB
     prefetch: 8
   }
-  include: { phase: TRAIN }
+  //include: { phase: TRAIN }
 }
 
-layer {
-  name: "data_layer"
-  type: "Data"
-  top: "data_blob"
-  top: "label_blob"
-  data_param {
-    source: "$test_lmdb"
-    batch_size: 2000
-    backend: LMDB
-    prefetch: 8
-  }
-  include: { phase: TEST }
-}
+//layer {
+//  name: "data_layer"
+//  type: "Data"
+//  top: "data_blob"
+//  top: "label_blob"
+//  data_param {
+//    source: "$test_lmdb"
+//    batch_size: 2000
+//    backend: LMDB
+//    prefetch: 8
+//  }
+//  include: { phase: TEST }
+//}
 
 layer {
   name: "hidden_sum_layer"

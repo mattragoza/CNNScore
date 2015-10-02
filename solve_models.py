@@ -18,6 +18,5 @@ if __name__ == "__main__":
     for solver in glob.glob(input_arg):
 
         command = "caffe train --solver="+solver + \
-            "2>&1 | tee -a logs/"+timestamp+".log"
-        print(command)
-        #os.system(command)
+            " 2>&1 | tee -a logs/"+timestamp+".log"
+        os.system(command)
