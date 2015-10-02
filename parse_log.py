@@ -1,6 +1,6 @@
 import sys
 
-USAGE = "python parse_log.py <log>"
+USAGE = "python parse_log.py <log_file>"
 
 class Log:
 
@@ -96,7 +96,7 @@ if __name__ == "__main__":
 		print("Usage: " + USAGE)
 		sys.exit(1)
 
-	file_arg = sys.argv[usage_format.index("<log>")]
+	file_arg = sys.argv[usage_format.index("<log_file>")]
 
 	print("Reading from " + file_arg)
 	try: log = Log(file_=file_arg)

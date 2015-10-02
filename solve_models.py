@@ -3,7 +3,7 @@ import os
 import glob
 import datetime
 
-USAGE = "python solve_models.py <input_dir>"
+USAGE = "python solve_models.py <input_pattern>"
 
 if __name__ == "__main__":
 
@@ -12,7 +12,7 @@ if __name__ == "__main__":
         print("Usage: " + USAGE)
         sys.exit(1)
 
-    input_arg = sys.argv[usage_format.index("<input_dir>")]
+    input_arg = sys.argv[usage_format.index("<input_pattern>")]
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     for solver in glob.glob(input_arg):

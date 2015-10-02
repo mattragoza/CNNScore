@@ -15,7 +15,7 @@ CSV_FORMATS = {
     },
 }
 
-USAGE = "python make_lmdb.py <data>"
+USAGE = "python make_lmdb.py <data_source>"
 
 
 
@@ -196,7 +196,7 @@ if __name__ == "__main__":
 		print("Usage: " + USAGE)
 		sys.exit(1)
 
-	file_arg   = sys.argv[usage_format.index("<data>")]
+	file_arg   = sys.argv[usage_format.index("<data_source>")]
 
 	print("Gathering data from " + file_arg)
 	try: db = Database(file_arg, "DUDE_SCOREDATA")
