@@ -11,7 +11,7 @@ layer {
     backend: LMDB
     prefetch: 8
   }
-  //include: { phase: TRAIN }
+//  include: { phase: TRAIN }
 }
 
 //layer {

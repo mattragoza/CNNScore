@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 
 USAGE = "python make_prototxt.py <data_source> <model_template> <solver_template> <output_dir>"
 
@@ -36,15 +37,17 @@ def write_prototxt(data_name, model_temp, solver_temp, output_dir, id_):
         full_lmdb = data_name+".full"
         model = model.replace("$train_lmdb", full_lmdb, 1)
         model = model.replace("$test_lmdb",  full_lmdb, 1)
+        model = re.sub(r'//.*?\n|/\*.*?\*/', "", model, re.S)
+        solver = re.sub(r'//.*?\n|/\*.*?\*/', "", solver, re.S)
 
     else: # cross-validation training and testing
-        model = model.replace("//", "") # uncomment lines relevant to testing
-        solver = solver.replace("//", "")
-
         train_lmdb = data_name+"."+id_+".train"
         test_lmdb  = data_name+"."+id_+".test"
         model = model.replace("$train_lmdb", train_lmdb, 1)
         model = model.replace("$test_lmdb",  test_lmdb,  1)
+        model = model.replace("//", "") # uncomment lines relevant to testing
+        solver = solver.replace("//", "")
+
 
     model_file = open(model_name, "w")
     model_file.write(model)
