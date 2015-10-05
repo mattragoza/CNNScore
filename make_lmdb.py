@@ -151,6 +151,33 @@ class Database:
 			self._parts.append(Database.Partition(self, train_set, test_set))
 
 
+	def normalize(self):
+
+		n = len(self._samples)
+		d = len(self._format["data"])
+
+		# compute mean for each feature
+		mean = [0 for i in range(d)]
+		for i in self._samples:
+			for j in range(d):
+				mean[j] += i._data[j]
+		mean = [i/n for i in mean]
+
+		# compute standard deviation for each feature
+		sd = [0 for i in range(d)]
+		for i in self._samples:
+			for j in range(d):
+				sd[j] += (i._data[j] - mean[j])**2
+		sd = [(i/n)**(0.5) for i in sd]
+
+		# normalize each feature- subtract mean, divide by std dev		
+		for i in self._samples:
+			for j in range(d):
+				if sd[j]:
+					i._data[j] = (i._data[j] - mean[j])/float(sd[j])
+				else:
+					i._data[j] = 0.0
+
 	class Partition:
 
 		def __init__(self, db, train, test):
@@ -204,6 +231,9 @@ if __name__ == "__main__":
 		print("Error: unknown input file format")
 		sys.exit(1)
 	print(str(db.nbytes) + " bytes read")
+
+	print("Normalizing data")
+	db.normalize()
 
 	print("Generating balanced partitions")
 	db.balanced_partition(n=10)
