@@ -65,17 +65,28 @@ class Log:
 			csv += ",train,test"
 		csv += "\n"
 
-		test_iter  = iter(self._data[0]["test"][0])
-		j = next(test_iter)
+		# index in testing points
+		j = 0
 
+		# index in training points
 		for i in range(len(self._data[0]["train"][0])):
 
-			csv += str(self._data[0]["train"][0][i])
+			# iteration (use first partitioned model)
+			tr = self._data[1]["train"][0][i]
+			te = self._data[1]["test"][0][j]
 
-			if j == self._data[0]["train"][0][i]: # a test iteration
+			csv += str(tr)
+
+			if te == tr: # a test iteration
+				full_model = True
 				for net in self._data:
-					csv += "," + str(net["train"][1][i]) + "," + str(net["test"][1][i])
-					j = next(test_iter)
+					if not full_model:
+						csv += "," + str(net["train"][1][i]) + "," + str(net["test"][1][j])
+					else:
+						csv += "," + str(net["train"][1][i]) + ","
+						full_model = False
+
+				j += 1
 
 			else: # no testing done
 				for net in self._data:
