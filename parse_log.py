@@ -59,7 +59,10 @@ class Log:
 
 		csv = ""
 		for n in range(len(self._data)):
-			csv += "," + str(n) + "," + str(n)
+			if n == 0:
+				csv += ",full,full"
+			else:
+				csv += ",part" + str(n-1) + ",part" + str(n-1)
 		csv += "\niteration"
 		for n in self._data:
 			csv += ",train,test"
