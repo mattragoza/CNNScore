@@ -76,7 +76,7 @@ layer {
 
 layer {
   name: "error_layer"
-  type: "SigmoidCrossEntropyLoss"
+  type: "CrossEntropyLoss"
   bottom: "output_act_blob"
   bottom: "label_blob"
   top: "error_blob"
