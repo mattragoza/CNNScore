@@ -1,0 +1,220 @@
+I1002 09:42:44.521437 25293 caffe.cpp:184] Using GPUs 0
+I1002 09:42:45.094990 25293 solver.cpp:54] Initializing solver from parameters: 
+test_iter: 100
+test_interval: 1000
+base_lr: 0.01
+display: 100
+max_iter: 10000
+lr_policy: "fixed"
+momentum: 0.9
+solver_mode: GPU
+device_id: 0
+net: "model/NNScore/nnscore_model_full.prototxt"
+I1002 09:42:45.095019 25293 solver.cpp:97] Creating training net from net file: model/NNScore/nnscore_model_full.prototxt
+I1002 09:42:45.095160 25293 net.cpp:339] The NetState phase (0) differed from the phase (1) specified by a rule in layer data_layer
+I1002 09:42:45.095196 25293 net.cpp:50] Initializing net from parameters: 
+name: "model/NNScore/nnscore_model_full.prototxt"
+state {
+  phase: TRAIN
+}
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  include {
+    phase: TRAIN
+  }
+  data_param {
+    source: "lmdb/SCOREDATA.vina.balanced.full"
+    batch_size: 20000
+    backend: LMDB
+    prefetch: 8
+  }
+}
+layer {
+  name: "hidden_sum_layer"
+  type: "InnerProduct"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "hidden_act_layer"
+  type: "Sigmoid"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
+}
+layer {
+  name: "output_sum_layer"
+  type: "InnerProduct"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "output_act_layer"
+  type: "Sigmoid"
+  bottom: "output_sum_blob"
+  top: "output_act_blob"
+}
+layer {
+  name: "error_layer"
+  type: "EuclideanLoss"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
+}
+I1002 09:42:45.095230 25293 layer_factory.hpp:76] Creating layer data_layer
+I1002 09:42:45.107450 25293 net.cpp:110] Creating Layer data_layer
+I1002 09:42:45.107480 25293 net.cpp:433] data_layer -> data_blob
+I1002 09:42:45.107501 25293 net.cpp:433] data_layer -> label_blob
+I1002 09:42:45.108080 25297 db_lmdb.cpp:23] Opened lmdb lmdb/SCOREDATA.vina.balanced.full
+I1002 09:42:45.793355 25293 data_layer.cpp:45] output data size: 20000,61,1,1
+I1002 09:42:45.798576 25293 net.cpp:155] Setting up data_layer
+I1002 09:42:45.798619 25293 net.cpp:163] Top shape: 20000 61 1 1 (1220000)
+I1002 09:42:45.798624 25293 net.cpp:163] Top shape: 20000 (20000)
+I1002 09:42:45.798630 25293 layer_factory.hpp:76] Creating layer hidden_sum_layer
+I1002 09:42:45.798642 25293 net.cpp:110] Creating Layer hidden_sum_layer
+I1002 09:42:45.798648 25293 net.cpp:477] hidden_sum_layer <- data_blob
+I1002 09:42:45.798661 25293 net.cpp:433] hidden_sum_layer -> hidden_sum_blob
+I1002 09:42:45.799042 25293 net.cpp:155] Setting up hidden_sum_layer
+I1002 09:42:45.799052 25293 net.cpp:163] Top shape: 20000 10 (200000)
+I1002 09:42:45.799077 25293 layer_factory.hpp:76] Creating layer hidden_act_layer
+I1002 09:42:45.799088 25293 net.cpp:110] Creating Layer hidden_act_layer
+I1002 09:42:45.799093 25293 net.cpp:477] hidden_act_layer <- hidden_sum_blob
+I1002 09:42:45.799098 25293 net.cpp:433] hidden_act_layer -> hidden_act_blob
+I1002 09:42:49.015369 25293 net.cpp:155] Setting up hidden_act_layer
+I1002 09:42:49.015393 25293 net.cpp:163] Top shape: 20000 10 (200000)
+I1002 09:42:49.015398 25293 layer_factory.hpp:76] Creating layer output_sum_layer
+I1002 09:42:49.015420 25293 net.cpp:110] Creating Layer output_sum_layer
+I1002 09:42:49.015425 25293 net.cpp:477] output_sum_layer <- hidden_act_blob
+I1002 09:42:49.015432 25293 net.cpp:433] output_sum_layer -> output_sum_blob
+I1002 09:42:49.015530 25293 net.cpp:155] Setting up output_sum_layer
+I1002 09:42:49.015538 25293 net.cpp:163] Top shape: 20000 1 (20000)
+I1002 09:42:49.015559 25293 layer_factory.hpp:76] Creating layer output_act_layer
+I1002 09:42:49.015569 25293 net.cpp:110] Creating Layer output_act_layer
+I1002 09:42:49.015574 25293 net.cpp:477] output_act_layer <- output_sum_blob
+I1002 09:42:49.015579 25293 net.cpp:433] output_act_layer -> output_act_blob
+I1002 09:42:49.015650 25293 net.cpp:155] Setting up output_act_layer
+I1002 09:42:49.015667 25293 net.cpp:163] Top shape: 20000 1 (20000)
+I1002 09:42:49.015672 25293 layer_factory.hpp:76] Creating layer error_layer
+I1002 09:42:49.015691 25293 net.cpp:110] Creating Layer error_layer
+I1002 09:42:49.015694 25293 net.cpp:477] error_layer <- output_act_blob
+I1002 09:42:49.015700 25293 net.cpp:477] error_layer <- label_blob
+I1002 09:42:49.015707 25293 net.cpp:433] error_layer -> error_blob
+I1002 09:42:49.015744 25293 net.cpp:155] Setting up error_layer
+I1002 09:42:49.015750 25293 net.cpp:163] Top shape: (1)
+I1002 09:42:49.015753 25293 net.cpp:168]     with loss weight 1
+I1002 09:42:49.015784 25293 net.cpp:236] error_layer needs backward computation.
+I1002 09:42:49.015787 25293 net.cpp:236] output_act_layer needs backward computation.
+I1002 09:42:49.015791 25293 net.cpp:236] output_sum_layer needs backward computation.
+I1002 09:42:49.015794 25293 net.cpp:236] hidden_act_layer needs backward computation.
+I1002 09:42:49.015799 25293 net.cpp:236] hidden_sum_layer needs backward computation.
+I1002 09:42:49.015804 25293 net.cpp:240] data_layer does not need backward computation.
+I1002 09:42:49.015806 25293 net.cpp:283] This network produces output error_blob
+I1002 09:42:49.015815 25293 net.cpp:297] Network initialization done.
+I1002 09:42:49.015817 25293 net.cpp:298] Memory required for data: 6720004
+I1002 09:42:49.015967 25293 solver.cpp:187] Creating test net (#0) specified by net file: model/NNScore/nnscore_model_full.prototxt
+I1002 09:42:49.015987 25293 net.cpp:339] The NetState phase (1) differed from the phase (0) specified by a rule in layer data_layer
+I1002 09:42:49.016026 25293 net.cpp:50] Initializing net from parameters: 
+name: "model/NNScore/nnscore_model_full.prototxt"
+state {
+  phase: TEST
+}
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  include {
+    phase: TEST
+  }
+  data_param {
+    source: "lmdb/SCOREDATA.vina.balanced.full"
+    batch_size: 2000
+    backend: LMDB
+    prefetch: 8
+  }
+}
+layer {
+  name: "hidden_sum_layer"
+  type: "InnerProduct"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "hidden_act_layer"
+  type: "Sigmoid"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
+}
+layer {
+  name: "output_sum_layer"
+  type: "InnerProduct"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "output_act_layer"
+  type: "Sigmoid"
+  bottom: "output_sum_blob"
+  top: "output_act_blob"
+}
+layer {
+  name: "error_layer"
+  type: "EuclideanLoss"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
+}
+I1002 09:42:49.016055 25293 layer_factory.hpp:76] Creating layer data_layer
+I1002 09:42:49.017318 25293 net.cpp:110] Creating Layer data_layer
+I1002 09:42:49.017326 25293 net.cpp:433] data_layer -> data_blob
+I1002 09:42:49.017333 25293 net.cpp:433] data_layer -> label_blob
+F1002 09:42:49.017334 25297 data_reader.cpp:98] Check failed: new_queue_pairs_.size() == 0 (1 vs. 0) 
+*** Check failure stack trace: ***
+    @     0x7f6ee8eaddaa  (unknown)
+    @     0x7f6ee8eadce4  (unknown)
+    @     0x7f6ee8ead6e6  (unknown)
+    @     0x7f6ee8eb0687  (unknown)
+    @     0x7f6ee92cf897  caffe::DataReader::Body::InternalThreadEntry()
+    @     0x7f6ee92d37af  caffe::InternalThread::entry()
+    @     0x7f6ee77a0a4a  (unknown)
+    @     0x7f6ee757f182  start_thread
+    @     0x7f6ee7ca947d  (unknown)
+    @              (nil)  (unknown)

@@ -1,0 +1,355 @@
+I1006 11:34:46.047916 18300 caffe.cpp:184] Using GPUs 0
+I1006 11:34:46.627012 18300 solver.cpp:54] Initializing solver from parameters: 
+test_iter: 10000
+test_interval: 100000
+base_lr: 0.01
+display: 10000
+max_iter: 1000000
+lr_policy: "fixed"
+momentum: 0.9
+solver_mode: GPU
+device_id: 0
+net: "small_batch/model1_part2.prototxt"
+I1006 11:34:46.627043 18300 solver.cpp:97] Creating training net from net file: small_batch/model1_part2.prototxt
+I1006 11:34:46.627202 18300 net.cpp:339] The NetState phase (0) differed from the phase (1) specified by a rule in layer data_layer
+I1006 11:34:46.627249 18300 net.cpp:50] Initializing net from parameters: 
+name: "small_batch/model1_part2.prototxt"
+state {
+  phase: TRAIN
+}
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  include {
+    phase: TRAIN
+  }
+  data_param {
+    source: "lmdb/SCOREDATA.vina.balanced.part2.train"
+    batch_size: 200
+    backend: LMDB
+    prefetch: 8
+  }
+}
+layer {
+  name: "hidden_sum_layer"
+  type: "InnerProduct"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "hidden_act_layer"
+  type: "Sigmoid"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
+}
+layer {
+  name: "output_sum_layer"
+  type: "InnerProduct"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "output_act_layer"
+  type: "Sigmoid"
+  bottom: "output_sum_blob"
+  top: "output_act_blob"
+}
+layer {
+  name: "error_layer"
+  type: "EuclideanLoss"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
+}
+I1006 11:34:46.627313 18300 layer_factory.hpp:76] Creating layer data_layer
+I1006 11:34:46.627913 18300 net.cpp:110] Creating Layer data_layer
+I1006 11:34:46.627944 18300 net.cpp:433] data_layer -> data_blob
+I1006 11:34:46.627990 18300 net.cpp:433] data_layer -> label_blob
+I1006 11:34:46.628584 18305 db_lmdb.cpp:23] Opened lmdb lmdb/SCOREDATA.vina.balanced.part2.train
+I1006 11:34:47.311542 18300 data_layer.cpp:45] output data size: 200,61,1,1
+I1006 11:34:47.311998 18300 net.cpp:155] Setting up data_layer
+I1006 11:34:47.312031 18300 net.cpp:163] Top shape: 200 61 1 1 (12200)
+I1006 11:34:47.312036 18300 net.cpp:163] Top shape: 200 (200)
+I1006 11:34:47.312052 18300 layer_factory.hpp:76] Creating layer hidden_sum_layer
+I1006 11:34:47.312063 18300 net.cpp:110] Creating Layer hidden_sum_layer
+I1006 11:34:47.312067 18300 net.cpp:477] hidden_sum_layer <- data_blob
+I1006 11:34:47.312075 18300 net.cpp:433] hidden_sum_layer -> hidden_sum_blob
+I1006 11:34:47.312430 18300 net.cpp:155] Setting up hidden_sum_layer
+I1006 11:34:47.312438 18300 net.cpp:163] Top shape: 200 10 (2000)
+I1006 11:34:47.312458 18300 layer_factory.hpp:76] Creating layer hidden_act_layer
+I1006 11:34:47.312476 18300 net.cpp:110] Creating Layer hidden_act_layer
+I1006 11:34:47.312479 18300 net.cpp:477] hidden_act_layer <- hidden_sum_blob
+I1006 11:34:47.312481 18300 net.cpp:433] hidden_act_layer -> hidden_act_blob
+I1006 11:34:50.563112 18300 net.cpp:155] Setting up hidden_act_layer
+I1006 11:34:50.563136 18300 net.cpp:163] Top shape: 200 10 (2000)
+I1006 11:34:50.563140 18300 layer_factory.hpp:76] Creating layer output_sum_layer
+I1006 11:34:50.563150 18300 net.cpp:110] Creating Layer output_sum_layer
+I1006 11:34:50.563153 18300 net.cpp:477] output_sum_layer <- hidden_act_blob
+I1006 11:34:50.563158 18300 net.cpp:433] output_sum_layer -> output_sum_blob
+I1006 11:34:50.563241 18300 net.cpp:155] Setting up output_sum_layer
+I1006 11:34:50.563246 18300 net.cpp:163] Top shape: 200 1 (200)
+I1006 11:34:50.563262 18300 layer_factory.hpp:76] Creating layer output_act_layer
+I1006 11:34:50.563277 18300 net.cpp:110] Creating Layer output_act_layer
+I1006 11:34:50.563278 18300 net.cpp:477] output_act_layer <- output_sum_blob
+I1006 11:34:50.563280 18300 net.cpp:433] output_act_layer -> output_act_blob
+I1006 11:34:50.563349 18300 net.cpp:155] Setting up output_act_layer
+I1006 11:34:50.563352 18300 net.cpp:163] Top shape: 200 1 (200)
+I1006 11:34:50.563370 18300 layer_factory.hpp:76] Creating layer error_layer
+I1006 11:34:50.563385 18300 net.cpp:110] Creating Layer error_layer
+I1006 11:34:50.563387 18300 net.cpp:477] error_layer <- output_act_blob
+I1006 11:34:50.563390 18300 net.cpp:477] error_layer <- label_blob
+I1006 11:34:50.563393 18300 net.cpp:433] error_layer -> error_blob
+I1006 11:34:50.563415 18300 net.cpp:155] Setting up error_layer
+I1006 11:34:50.563427 18300 net.cpp:163] Top shape: (1)
+I1006 11:34:50.563429 18300 net.cpp:168]     with loss weight 1
+I1006 11:34:50.563454 18300 net.cpp:236] error_layer needs backward computation.
+I1006 11:34:50.563465 18300 net.cpp:236] output_act_layer needs backward computation.
+I1006 11:34:50.563467 18300 net.cpp:236] output_sum_layer needs backward computation.
+I1006 11:34:50.563469 18300 net.cpp:236] hidden_act_layer needs backward computation.
+I1006 11:34:50.563470 18300 net.cpp:236] hidden_sum_layer needs backward computation.
+I1006 11:34:50.563473 18300 net.cpp:240] data_layer does not need backward computation.
+I1006 11:34:50.563485 18300 net.cpp:283] This network produces output error_blob
+I1006 11:34:50.563489 18300 net.cpp:297] Network initialization done.
+I1006 11:34:50.563491 18300 net.cpp:298] Memory required for data: 67204
+I1006 11:34:50.563619 18300 solver.cpp:187] Creating test net (#0) specified by net file: small_batch/model1_part2.prototxt
+I1006 11:34:50.563650 18300 net.cpp:339] The NetState phase (1) differed from the phase (0) specified by a rule in layer data_layer
+I1006 11:34:50.563709 18300 net.cpp:50] Initializing net from parameters: 
+name: "small_batch/model1_part2.prototxt"
+state {
+  phase: TEST
+}
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  include {
+    phase: TEST
+  }
+  data_param {
+    source: "lmdb/SCOREDATA.vina.balanced.part2.test"
+    batch_size: 20
+    backend: LMDB
+    prefetch: 8
+  }
+}
+layer {
+  name: "hidden_sum_layer"
+  type: "InnerProduct"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "hidden_act_layer"
+  type: "Sigmoid"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
+}
+layer {
+  name: "output_sum_layer"
+  type: "InnerProduct"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "output_act_layer"
+  type: "Sigmoid"
+  bottom: "output_sum_blob"
+  top: "output_act_blob"
+}
+layer {
+  name: "error_layer"
+  type: "EuclideanLoss"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
+}
+I1006 11:34:50.563730 18300 layer_factory.hpp:76] Creating layer data_layer
+I1006 11:34:50.563789 18300 net.cpp:110] Creating Layer data_layer
+I1006 11:34:50.563803 18300 net.cpp:433] data_layer -> data_blob
+I1006 11:34:50.563808 18300 net.cpp:433] data_layer -> label_blob
+I1006 11:34:50.564355 18309 db_lmdb.cpp:23] Opened lmdb lmdb/SCOREDATA.vina.balanced.part2.test
+I1006 11:34:50.564437 18300 data_layer.cpp:45] output data size: 20,61,1,1
+I1006 11:34:50.564971 18300 net.cpp:155] Setting up data_layer
+I1006 11:34:50.564980 18300 net.cpp:163] Top shape: 20 61 1 1 (1220)
+I1006 11:34:50.564982 18300 net.cpp:163] Top shape: 20 (20)
+I1006 11:34:50.564985 18300 layer_factory.hpp:76] Creating layer hidden_sum_layer
+I1006 11:34:50.564990 18300 net.cpp:110] Creating Layer hidden_sum_layer
+I1006 11:34:50.564991 18300 net.cpp:477] hidden_sum_layer <- data_blob
+I1006 11:34:50.564996 18300 net.cpp:433] hidden_sum_layer -> hidden_sum_blob
+I1006 11:34:50.565088 18300 net.cpp:155] Setting up hidden_sum_layer
+I1006 11:34:50.565093 18300 net.cpp:163] Top shape: 20 10 (200)
+I1006 11:34:50.565099 18300 layer_factory.hpp:76] Creating layer hidden_act_layer
+I1006 11:34:50.565101 18300 net.cpp:110] Creating Layer hidden_act_layer
+I1006 11:34:50.565104 18300 net.cpp:477] hidden_act_layer <- hidden_sum_blob
+I1006 11:34:50.565114 18300 net.cpp:433] hidden_act_layer -> hidden_act_blob
+I1006 11:34:50.565268 18300 net.cpp:155] Setting up hidden_act_layer
+I1006 11:34:50.565274 18300 net.cpp:163] Top shape: 20 10 (200)
+I1006 11:34:50.565276 18300 layer_factory.hpp:76] Creating layer output_sum_layer
+I1006 11:34:50.565280 18300 net.cpp:110] Creating Layer output_sum_layer
+I1006 11:34:50.565282 18300 net.cpp:477] output_sum_layer <- hidden_act_blob
+I1006 11:34:50.565285 18300 net.cpp:433] output_sum_layer -> output_sum_blob
+I1006 11:34:50.565337 18300 net.cpp:155] Setting up output_sum_layer
+I1006 11:34:50.565342 18300 net.cpp:163] Top shape: 20 1 (20)
+I1006 11:34:50.565347 18300 layer_factory.hpp:76] Creating layer output_act_layer
+I1006 11:34:50.565351 18300 net.cpp:110] Creating Layer output_act_layer
+I1006 11:34:50.565352 18300 net.cpp:477] output_act_layer <- output_sum_blob
+I1006 11:34:50.565356 18300 net.cpp:433] output_act_layer -> output_act_blob
+I1006 11:34:50.565402 18300 net.cpp:155] Setting up output_act_layer
+I1006 11:34:50.565405 18300 net.cpp:163] Top shape: 20 1 (20)
+I1006 11:34:50.565407 18300 layer_factory.hpp:76] Creating layer error_layer
+I1006 11:34:50.565410 18300 net.cpp:110] Creating Layer error_layer
+I1006 11:34:50.565412 18300 net.cpp:477] error_layer <- output_act_blob
+I1006 11:34:50.565414 18300 net.cpp:477] error_layer <- label_blob
+I1006 11:34:50.565417 18300 net.cpp:433] error_layer -> error_blob
+I1006 11:34:50.565433 18300 net.cpp:155] Setting up error_layer
+I1006 11:34:50.565435 18300 net.cpp:163] Top shape: (1)
+I1006 11:34:50.565438 18300 net.cpp:168]     with loss weight 1
+I1006 11:34:50.565441 18300 net.cpp:236] error_layer needs backward computation.
+I1006 11:34:50.565443 18300 net.cpp:236] output_act_layer needs backward computation.
+I1006 11:34:50.565445 18300 net.cpp:236] output_sum_layer needs backward computation.
+I1006 11:34:50.565448 18300 net.cpp:236] hidden_act_layer needs backward computation.
+I1006 11:34:50.565449 18300 net.cpp:236] hidden_sum_layer needs backward computation.
+I1006 11:34:50.565451 18300 net.cpp:240] data_layer does not need backward computation.
+I1006 11:34:50.565454 18300 net.cpp:283] This network produces output error_blob
+I1006 11:34:50.565457 18300 net.cpp:297] Network initialization done.
+I1006 11:34:50.565459 18300 net.cpp:298] Memory required for data: 6724
+I1006 11:34:50.565470 18300 solver.cpp:66] Solver scaffolding done.
+I1006 11:34:50.565552 18300 caffe.cpp:212] Starting Optimization
+I1006 11:34:50.565557 18300 solver.cpp:294] Solving small_batch/model1_part2.prototxt
+I1006 11:34:50.565559 18300 solver.cpp:295] Learning Rate Policy: fixed
+I1006 11:34:50.565724 18300 solver.cpp:347] Iteration 0, Testing net (#0)
+I1006 11:34:50.565778 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:51.707847 18300 solver.cpp:415]     Test net output #0: error_blob = 0.126048 (* 1 = 0.126048 loss)
+I1006 11:34:51.708194 18300 solver.cpp:243] Iteration 0, loss = 0.0838536
+I1006 11:34:51.708205 18300 solver.cpp:259]     Train net output #0: error_blob = 0.0838536 (* 1 = 0.0838536 loss)
+I1006 11:34:51.708214 18300 solver.cpp:590] Iteration 0, lr = 0.01
+I1006 11:34:51.972280 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:52.229512 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:52.494451 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:52.759305 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:53.023731 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:53.294047 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:53.560072 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:53.827497 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:54.090847 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:54.351467 18300 solver.cpp:243] Iteration 10000, loss = 0.079081
+I1006 11:34:54.351505 18300 solver.cpp:259]     Train net output #0: error_blob = 0.0790809 (* 1 = 0.0790809 loss)
+I1006 11:34:54.351531 18300 solver.cpp:590] Iteration 10000, lr = 0.01
+I1006 11:34:54.356024 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:54.622467 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:54.883467 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:55.147511 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:55.411387 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:55.673701 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:55.936619 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:56.197670 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:56.457757 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:56.722967 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:56.981636 18300 solver.cpp:243] Iteration 20000, loss = 0.0559199
+I1006 11:34:56.981674 18300 solver.cpp:259]     Train net output #0: error_blob = 0.0559197 (* 1 = 0.0559197 loss)
+I1006 11:34:56.981678 18300 solver.cpp:590] Iteration 20000, lr = 0.01
+I1006 11:34:56.986088 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:57.244540 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:57.507776 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:57.771188 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:58.034739 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:58.300556 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:58.565999 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:58.822979 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:59.086731 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:59.349409 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:59.609164 18300 solver.cpp:243] Iteration 30000, loss = 0.120274
+I1006 11:34:59.609196 18300 solver.cpp:259]     Train net output #0: error_blob = 0.120273 (* 1 = 0.120273 loss)
+I1006 11:34:59.609203 18300 solver.cpp:590] Iteration 30000, lr = 0.01
+I1006 11:34:59.624938 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:34:59.896512 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:00.161247 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:00.423328 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:00.686447 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:00.946594 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:01.210917 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:01.471320 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:01.730913 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:01.992736 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:02.233510 18300 solver.cpp:243] Iteration 40000, loss = 0.105497
+I1006 11:35:02.233547 18300 solver.cpp:259]     Train net output #0: error_blob = 0.105497 (* 1 = 0.105497 loss)
+I1006 11:35:02.233551 18300 solver.cpp:590] Iteration 40000, lr = 0.01
+I1006 11:35:02.257323 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:02.518920 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:02.783323 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:03.048182 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:03.309839 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:03.566076 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:03.832217 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:04.096343 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:04.362351 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:04.622815 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:04.860725 18300 solver.cpp:243] Iteration 50000, loss = 0.0580025
+I1006 11:35:04.860761 18300 solver.cpp:259]     Train net output #0: error_blob = 0.0580023 (* 1 = 0.0580023 loss)
+I1006 11:35:04.860765 18300 solver.cpp:590] Iteration 50000, lr = 0.01
+I1006 11:35:04.886104 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:05.149044 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:05.412281 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:05.678429 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:05.941289 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:06.203049 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:06.467780 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:06.732056 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:07.010789 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:07.302042 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:07.503454 18300 solver.cpp:243] Iteration 60000, loss = 0.0861052
+I1006 11:35:07.503492 18300 solver.cpp:259]     Train net output #0: error_blob = 0.086105 (* 1 = 0.086105 loss)
+I1006 11:35:07.503497 18300 solver.cpp:590] Iteration 60000, lr = 0.01
+I1006 11:35:07.571970 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:07.837123 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:08.104867 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:08.372771 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:08.639205 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:08.897310 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:09.159548 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:09.422910 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:09.682627 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:09.945879 18300 blocking_queue.cpp:50] Data layer prefetch queue empty
+I1006 11:35:10.141758 18300 solver.cpp:243] Iteration 70000, loss = 0.0606903
+I1006 11:35:10.141787 18300 solver.cpp:259]     Train net output #0: error_blob = 0.0606901 (* 1 = 0.0606901 loss)
+I1006 11:35:10.141791 18300 solver.cpp:590] Iteration 70000, lr = 0.01
+I1006 11:35:10.210786 18300 blocking_queue.cpp:50] Data layer prefetch queue empty

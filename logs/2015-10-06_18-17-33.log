@@ -1,0 +1,1039 @@
+I1006 18:17:33.708616 25680 caffe.cpp:184] Using GPUs 0
+I1006 18:17:34.284998 25680 solver.cpp:54] Initializing solver from parameters: 
+test_iter: 1
+test_interval: 100
+base_lr: 0.01
+display: 100
+max_iter: 1000
+lr_policy: "fixed"
+momentum: 0.9
+solver_mode: GPU
+device_id: 0
+net: "full_batch_ce/model2_part2.prototxt"
+I1006 18:17:34.285032 25680 solver.cpp:97] Creating training net from net file: full_batch_ce/model2_part2.prototxt
+I1006 18:17:34.285178 25680 net.cpp:339] The NetState phase (0) differed from the phase (1) specified by a rule in layer data_layer
+I1006 18:17:34.285217 25680 net.cpp:50] Initializing net from parameters: 
+name: "full_batch_ce/model2_part2.prototxt"
+state {
+  phase: TRAIN
+}
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  include {
+    phase: TRAIN
+  }
+  data_param {
+    source: "lmdb/SCOREDATA.vina.balanced.part2.train"
+    batch_size: 40000
+    backend: LMDB
+    prefetch: 8
+  }
+}
+layer {
+  name: "hidden_sum_layer"
+  type: "InnerProduct"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "hidden_act_layer"
+  type: "Sigmoid"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
+}
+layer {
+  name: "output_sum_layer"
+  type: "InnerProduct"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "error_layer"
+  type: "SigmoidCrossEntropyLoss"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
+}
+F1006 18:17:34.285243 25680 insert_splits.cpp:35] Unknown bottom blob 'output_act_blob' (layer 'error_layer', bottom index 0)
+*** Check failure stack trace: ***
+    @     0x7f0e1e74ddaa  (unknown)
+    @     0x7f0e1e74dce4  (unknown)
+    @     0x7f0e1e74d6e6  (unknown)
+    @     0x7f0e1e750687  (unknown)
+    @     0x7f0e1ebaa91e  caffe::InsertSplits()
+    @     0x7f0e1ebe5b0b  caffe::Net<>::Init()
+    @     0x7f0e1ebe81a5  caffe::Net<>::Net()
+    @     0x7f0e1eb8338a  caffe::Solver<>::InitTrainNet()
+    @     0x7f0e1eb844cc  caffe::Solver<>::Init()
+    @     0x7f0e1eb847d9  caffe::Solver<>::Solver()
+    @           0x412945  caffe::GetSolver<>()
+    @           0x40b626  train()
+    @           0x409471  main
+    @     0x7f0e1d470ec5  (unknown)
+    @           0x409c0b  (unknown)
+    @              (nil)  (unknown)
+I1006 18:17:34.387511 25686 caffe.cpp:184] Using GPUs 0
+I1006 18:17:34.946449 25686 solver.cpp:54] Initializing solver from parameters: 
+test_iter: 1
+test_interval: 100
+base_lr: 0.01
+display: 100
+max_iter: 1000
+lr_policy: "fixed"
+momentum: 0.9
+solver_mode: GPU
+device_id: 0
+net: "full_batch_ce/model2_part5.prototxt"
+I1006 18:17:34.946478 25686 solver.cpp:97] Creating training net from net file: full_batch_ce/model2_part5.prototxt
+I1006 18:17:34.946622 25686 net.cpp:339] The NetState phase (0) differed from the phase (1) specified by a rule in layer data_layer
+I1006 18:17:34.946656 25686 net.cpp:50] Initializing net from parameters: 
+name: "full_batch_ce/model2_part5.prototxt"
+state {
+  phase: TRAIN
+}
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  include {
+    phase: TRAIN
+  }
+  data_param {
+    source: "lmdb/SCOREDATA.vina.balanced.part5.train"
+    batch_size: 40000
+    backend: LMDB
+    prefetch: 8
+  }
+}
+layer {
+  name: "hidden_sum_layer"
+  type: "InnerProduct"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "hidden_act_layer"
+  type: "Sigmoid"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
+}
+layer {
+  name: "output_sum_layer"
+  type: "InnerProduct"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "error_layer"
+  type: "SigmoidCrossEntropyLoss"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
+}
+F1006 18:17:34.946677 25686 insert_splits.cpp:35] Unknown bottom blob 'output_act_blob' (layer 'error_layer', bottom index 0)
+*** Check failure stack trace: ***
+    @     0x7f095de66daa  (unknown)
+    @     0x7f095de66ce4  (unknown)
+    @     0x7f095de666e6  (unknown)
+    @     0x7f095de69687  (unknown)
+    @     0x7f095e2c391e  caffe::InsertSplits()
+    @     0x7f095e2feb0b  caffe::Net<>::Init()
+    @     0x7f095e3011a5  caffe::Net<>::Net()
+    @     0x7f095e29c38a  caffe::Solver<>::InitTrainNet()
+    @     0x7f095e29d4cc  caffe::Solver<>::Init()
+    @     0x7f095e29d7d9  caffe::Solver<>::Solver()
+    @           0x412945  caffe::GetSolver<>()
+    @           0x40b626  train()
+    @           0x409471  main
+    @     0x7f095cb89ec5  (unknown)
+    @           0x409c0b  (unknown)
+    @              (nil)  (unknown)
+I1006 18:17:35.049134 25693 caffe.cpp:184] Using GPUs 0
+I1006 18:17:35.606979 25693 solver.cpp:54] Initializing solver from parameters: 
+base_lr: 0.01
+display: 100
+max_iter: 1000
+lr_policy: "fixed"
+momentum: 0.9
+solver_mode: GPU
+device_id: 0
+net: "full_batch_ce/model2_full.prototxt"
+I1006 18:17:35.607010 25693 solver.cpp:97] Creating training net from net file: full_batch_ce/model2_full.prototxt
+I1006 18:17:35.607164 25693 net.cpp:50] Initializing net from parameters: 
+name: "full_batch_ce/model2_full.prototxt"
+state {
+  phase: TRAIN
+}
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  data_param {
+    source: "lmdb/SCOREDATA.vina.balanced.full"
+    batch_size: 40000
+    backend: LMDB
+    prefetch: 8
+  }
+}
+layer {
+  name: "hidden_sum_layer"
+  type: "InnerProduct"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "hidden_act_layer"
+  type: "Sigmoid"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
+}
+layer {
+  name: "output_sum_layer"
+  type: "InnerProduct"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "error_layer"
+  type: "SigmoidCrossEntropyLoss"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
+}
+F1006 18:17:35.607187 25693 insert_splits.cpp:35] Unknown bottom blob 'output_act_blob' (layer 'error_layer', bottom index 0)
+*** Check failure stack trace: ***
+    @     0x7fb73ae16daa  (unknown)
+    @     0x7fb73ae16ce4  (unknown)
+    @     0x7fb73ae166e6  (unknown)
+    @     0x7fb73ae19687  (unknown)
+    @     0x7fb73b27391e  caffe::InsertSplits()
+    @     0x7fb73b2aeb0b  caffe::Net<>::Init()
+    @     0x7fb73b2b11a5  caffe::Net<>::Net()
+    @     0x7fb73b24c38a  caffe::Solver<>::InitTrainNet()
+    @     0x7fb73b24d4cc  caffe::Solver<>::Init()
+    @     0x7fb73b24d7d9  caffe::Solver<>::Solver()
+    @           0x412945  caffe::GetSolver<>()
+    @           0x40b626  train()
+    @           0x409471  main
+    @     0x7fb739b39ec5  (unknown)
+    @           0x409c0b  (unknown)
+    @              (nil)  (unknown)
+I1006 18:17:35.711001 25699 caffe.cpp:184] Using GPUs 0
+I1006 18:17:36.268510 25699 solver.cpp:54] Initializing solver from parameters: 
+test_iter: 1
+test_interval: 100
+base_lr: 0.01
+display: 100
+max_iter: 1000
+lr_policy: "fixed"
+momentum: 0.9
+solver_mode: GPU
+device_id: 0
+net: "full_batch_ce/model2_part9.prototxt"
+I1006 18:17:36.268546 25699 solver.cpp:97] Creating training net from net file: full_batch_ce/model2_part9.prototxt
+I1006 18:17:36.268692 25699 net.cpp:339] The NetState phase (0) differed from the phase (1) specified by a rule in layer data_layer
+I1006 18:17:36.268729 25699 net.cpp:50] Initializing net from parameters: 
+name: "full_batch_ce/model2_part9.prototxt"
+state {
+  phase: TRAIN
+}
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  include {
+    phase: TRAIN
+  }
+  data_param {
+    source: "lmdb/SCOREDATA.vina.balanced.part9.train"
+    batch_size: 40000
+    backend: LMDB
+    prefetch: 8
+  }
+}
+layer {
+  name: "hidden_sum_layer"
+  type: "InnerProduct"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "hidden_act_layer"
+  type: "Sigmoid"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
+}
+layer {
+  name: "output_sum_layer"
+  type: "InnerProduct"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "error_layer"
+  type: "SigmoidCrossEntropyLoss"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
+}
+F1006 18:17:36.268756 25699 insert_splits.cpp:35] Unknown bottom blob 'output_act_blob' (layer 'error_layer', bottom index 0)
+*** Check failure stack trace: ***
+    @     0x7f5603d01daa  (unknown)
+    @     0x7f5603d01ce4  (unknown)
+    @     0x7f5603d016e6  (unknown)
+    @     0x7f5603d04687  (unknown)
+    @     0x7f560415e91e  caffe::InsertSplits()
+    @     0x7f5604199b0b  caffe::Net<>::Init()
+    @     0x7f560419c1a5  caffe::Net<>::Net()
+    @     0x7f560413738a  caffe::Solver<>::InitTrainNet()
+    @     0x7f56041384cc  caffe::Solver<>::Init()
+    @     0x7f56041387d9  caffe::Solver<>::Solver()
+    @           0x412945  caffe::GetSolver<>()
+    @           0x40b626  train()
+    @           0x409471  main
+    @     0x7f5602a24ec5  (unknown)
+    @           0x409c0b  (unknown)
+    @              (nil)  (unknown)
+I1006 18:17:36.378430 25705 caffe.cpp:184] Using GPUs 0
+I1006 18:17:36.940328 25705 solver.cpp:54] Initializing solver from parameters: 
+test_iter: 1
+test_interval: 100
+base_lr: 0.01
+display: 100
+max_iter: 1000
+lr_policy: "fixed"
+momentum: 0.9
+solver_mode: GPU
+device_id: 0
+net: "full_batch_ce/model2_part0.prototxt"
+I1006 18:17:36.940359 25705 solver.cpp:97] Creating training net from net file: full_batch_ce/model2_part0.prototxt
+I1006 18:17:36.940534 25705 net.cpp:339] The NetState phase (0) differed from the phase (1) specified by a rule in layer data_layer
+I1006 18:17:36.940578 25705 net.cpp:50] Initializing net from parameters: 
+name: "full_batch_ce/model2_part0.prototxt"
+state {
+  phase: TRAIN
+}
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  include {
+    phase: TRAIN
+  }
+  data_param {
+    source: "lmdb/SCOREDATA.vina.balanced.part0.train"
+    batch_size: 40000
+    backend: LMDB
+    prefetch: 8
+  }
+}
+layer {
+  name: "hidden_sum_layer"
+  type: "InnerProduct"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "hidden_act_layer"
+  type: "Sigmoid"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
+}
+layer {
+  name: "output_sum_layer"
+  type: "InnerProduct"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "error_layer"
+  type: "SigmoidCrossEntropyLoss"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
+}
+F1006 18:17:36.940598 25705 insert_splits.cpp:35] Unknown bottom blob 'output_act_blob' (layer 'error_layer', bottom index 0)
+*** Check failure stack trace: ***
+    @     0x7f8079d49daa  (unknown)
+    @     0x7f8079d49ce4  (unknown)
+    @     0x7f8079d496e6  (unknown)
+    @     0x7f8079d4c687  (unknown)
+    @     0x7f807a1a691e  caffe::InsertSplits()
+    @     0x7f807a1e1b0b  caffe::Net<>::Init()
+    @     0x7f807a1e41a5  caffe::Net<>::Net()
+    @     0x7f807a17f38a  caffe::Solver<>::InitTrainNet()
+    @     0x7f807a1804cc  caffe::Solver<>::Init()
+    @     0x7f807a1807d9  caffe::Solver<>::Solver()
+    @           0x412945  caffe::GetSolver<>()
+    @           0x40b626  train()
+    @           0x409471  main
+    @     0x7f8078a6cec5  (unknown)
+    @           0x409c0b  (unknown)
+    @              (nil)  (unknown)
+I1006 18:17:37.045344 25711 caffe.cpp:184] Using GPUs 0
+I1006 18:17:37.607241 25711 solver.cpp:54] Initializing solver from parameters: 
+test_iter: 1
+test_interval: 100
+base_lr: 0.01
+display: 100
+max_iter: 1000
+lr_policy: "fixed"
+momentum: 0.9
+solver_mode: GPU
+device_id: 0
+net: "full_batch_ce/model2_part1.prototxt"
+I1006 18:17:37.607271 25711 solver.cpp:97] Creating training net from net file: full_batch_ce/model2_part1.prototxt
+I1006 18:17:37.607435 25711 net.cpp:339] The NetState phase (0) differed from the phase (1) specified by a rule in layer data_layer
+I1006 18:17:37.607481 25711 net.cpp:50] Initializing net from parameters: 
+name: "full_batch_ce/model2_part1.prototxt"
+state {
+  phase: TRAIN
+}
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  include {
+    phase: TRAIN
+  }
+  data_param {
+    source: "lmdb/SCOREDATA.vina.balanced.part1.train"
+    batch_size: 40000
+    backend: LMDB
+    prefetch: 8
+  }
+}
+layer {
+  name: "hidden_sum_layer"
+  type: "InnerProduct"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "hidden_act_layer"
+  type: "Sigmoid"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
+}
+layer {
+  name: "output_sum_layer"
+  type: "InnerProduct"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "error_layer"
+  type: "SigmoidCrossEntropyLoss"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
+}
+F1006 18:17:37.607520 25711 insert_splits.cpp:35] Unknown bottom blob 'output_act_blob' (layer 'error_layer', bottom index 0)
+*** Check failure stack trace: ***
+    @     0x7f822fcabdaa  (unknown)
+    @     0x7f822fcabce4  (unknown)
+    @     0x7f822fcab6e6  (unknown)
+    @     0x7f822fcae687  (unknown)
+    @     0x7f823010891e  caffe::InsertSplits()
+    @     0x7f8230143b0b  caffe::Net<>::Init()
+    @     0x7f82301461a5  caffe::Net<>::Net()
+    @     0x7f82300e138a  caffe::Solver<>::InitTrainNet()
+    @     0x7f82300e24cc  caffe::Solver<>::Init()
+    @     0x7f82300e27d9  caffe::Solver<>::Solver()
+    @           0x412945  caffe::GetSolver<>()
+    @           0x40b626  train()
+    @           0x409471  main
+    @     0x7f822e9ceec5  (unknown)
+    @           0x409c0b  (unknown)
+    @              (nil)  (unknown)
+I1006 18:17:37.710049 25717 caffe.cpp:184] Using GPUs 0
+I1006 18:17:38.273514 25717 solver.cpp:54] Initializing solver from parameters: 
+test_iter: 1
+test_interval: 100
+base_lr: 0.01
+display: 100
+max_iter: 1000
+lr_policy: "fixed"
+momentum: 0.9
+solver_mode: GPU
+device_id: 0
+net: "full_batch_ce/model2_part8.prototxt"
+I1006 18:17:38.273545 25717 solver.cpp:97] Creating training net from net file: full_batch_ce/model2_part8.prototxt
+I1006 18:17:38.273689 25717 net.cpp:339] The NetState phase (0) differed from the phase (1) specified by a rule in layer data_layer
+I1006 18:17:38.273725 25717 net.cpp:50] Initializing net from parameters: 
+name: "full_batch_ce/model2_part8.prototxt"
+state {
+  phase: TRAIN
+}
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  include {
+    phase: TRAIN
+  }
+  data_param {
+    source: "lmdb/SCOREDATA.vina.balanced.part8.train"
+    batch_size: 40000
+    backend: LMDB
+    prefetch: 8
+  }
+}
+layer {
+  name: "hidden_sum_layer"
+  type: "InnerProduct"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "hidden_act_layer"
+  type: "Sigmoid"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
+}
+layer {
+  name: "output_sum_layer"
+  type: "InnerProduct"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "error_layer"
+  type: "SigmoidCrossEntropyLoss"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
+}
+F1006 18:17:38.273743 25717 insert_splits.cpp:35] Unknown bottom blob 'output_act_blob' (layer 'error_layer', bottom index 0)
+*** Check failure stack trace: ***
+    @     0x7f0c26036daa  (unknown)
+    @     0x7f0c26036ce4  (unknown)
+    @     0x7f0c260366e6  (unknown)
+    @     0x7f0c26039687  (unknown)
+    @     0x7f0c2649391e  caffe::InsertSplits()
+    @     0x7f0c264ceb0b  caffe::Net<>::Init()
+    @     0x7f0c264d11a5  caffe::Net<>::Net()
+    @     0x7f0c2646c38a  caffe::Solver<>::InitTrainNet()
+    @     0x7f0c2646d4cc  caffe::Solver<>::Init()
+    @     0x7f0c2646d7d9  caffe::Solver<>::Solver()
+    @           0x412945  caffe::GetSolver<>()
+    @           0x40b626  train()
+    @           0x409471  main
+    @     0x7f0c24d59ec5  (unknown)
+    @           0x409c0b  (unknown)
+    @              (nil)  (unknown)
+I1006 18:17:38.387008 25725 caffe.cpp:184] Using GPUs 0
+I1006 18:17:38.945564 25725 solver.cpp:54] Initializing solver from parameters: 
+test_iter: 1
+test_interval: 100
+base_lr: 0.01
+display: 100
+max_iter: 1000
+lr_policy: "fixed"
+momentum: 0.9
+solver_mode: GPU
+device_id: 0
+net: "full_batch_ce/model2_part4.prototxt"
+I1006 18:17:38.945595 25725 solver.cpp:97] Creating training net from net file: full_batch_ce/model2_part4.prototxt
+I1006 18:17:38.945801 25725 net.cpp:339] The NetState phase (0) differed from the phase (1) specified by a rule in layer data_layer
+I1006 18:17:38.945844 25725 net.cpp:50] Initializing net from parameters: 
+name: "full_batch_ce/model2_part4.prototxt"
+state {
+  phase: TRAIN
+}
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  include {
+    phase: TRAIN
+  }
+  data_param {
+    source: "lmdb/SCOREDATA.vina.balanced.part4.train"
+    batch_size: 40000
+    backend: LMDB
+    prefetch: 8
+  }
+}
+layer {
+  name: "hidden_sum_layer"
+  type: "InnerProduct"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "hidden_act_layer"
+  type: "Sigmoid"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
+}
+layer {
+  name: "output_sum_layer"
+  type: "InnerProduct"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "error_layer"
+  type: "SigmoidCrossEntropyLoss"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
+}
+F1006 18:17:38.945864 25725 insert_splits.cpp:35] Unknown bottom blob 'output_act_blob' (layer 'error_layer', bottom index 0)
+*** Check failure stack trace: ***
+    @     0x7f91fa8afdaa  (unknown)
+    @     0x7f91fa8afce4  (unknown)
+    @     0x7f91fa8af6e6  (unknown)
+    @     0x7f91fa8b2687  (unknown)
+    @     0x7f91fad0c91e  caffe::InsertSplits()
+    @     0x7f91fad47b0b  caffe::Net<>::Init()
+    @     0x7f91fad4a1a5  caffe::Net<>::Net()
+    @     0x7f91face538a  caffe::Solver<>::InitTrainNet()
+    @     0x7f91face64cc  caffe::Solver<>::Init()
+    @     0x7f91face67d9  caffe::Solver<>::Solver()
+    @           0x412945  caffe::GetSolver<>()
+    @           0x40b626  train()
+    @           0x409471  main
+    @     0x7f91f95d2ec5  (unknown)
+    @           0x409c0b  (unknown)
+    @              (nil)  (unknown)
+I1006 18:17:39.050439 25732 caffe.cpp:184] Using GPUs 0
+I1006 18:17:39.606781 25732 solver.cpp:54] Initializing solver from parameters: 
+test_iter: 1
+test_interval: 100
+base_lr: 0.01
+display: 100
+max_iter: 1000
+lr_policy: "fixed"
+momentum: 0.9
+solver_mode: GPU
+device_id: 0
+net: "full_batch_ce/model2_part7.prototxt"
+I1006 18:17:39.606819 25732 solver.cpp:97] Creating training net from net file: full_batch_ce/model2_part7.prototxt
+I1006 18:17:39.607007 25732 net.cpp:339] The NetState phase (0) differed from the phase (1) specified by a rule in layer data_layer
+I1006 18:17:39.607062 25732 net.cpp:50] Initializing net from parameters: 
+name: "full_batch_ce/model2_part7.prototxt"
+state {
+  phase: TRAIN
+}
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  include {
+    phase: TRAIN
+  }
+  data_param {
+    source: "lmdb/SCOREDATA.vina.balanced.part7.train"
+    batch_size: 40000
+    backend: LMDB
+    prefetch: 8
+  }
+}
+layer {
+  name: "hidden_sum_layer"
+  type: "InnerProduct"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "hidden_act_layer"
+  type: "Sigmoid"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
+}
+layer {
+  name: "output_sum_layer"
+  type: "InnerProduct"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "error_layer"
+  type: "SigmoidCrossEntropyLoss"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
+}
+F1006 18:17:39.607101 25732 insert_splits.cpp:35] Unknown bottom blob 'output_act_blob' (layer 'error_layer', bottom index 0)
+*** Check failure stack trace: ***
+    @     0x7f747c551daa  (unknown)
+    @     0x7f747c551ce4  (unknown)
+    @     0x7f747c5516e6  (unknown)
+    @     0x7f747c554687  (unknown)
+    @     0x7f747c9ae91e  caffe::InsertSplits()
+    @     0x7f747c9e9b0b  caffe::Net<>::Init()
+    @     0x7f747c9ec1a5  caffe::Net<>::Net()
+    @     0x7f747c98738a  caffe::Solver<>::InitTrainNet()
+    @     0x7f747c9884cc  caffe::Solver<>::Init()
+    @     0x7f747c9887d9  caffe::Solver<>::Solver()
+    @           0x412945  caffe::GetSolver<>()
+    @           0x40b626  train()
+    @           0x409471  main
+    @     0x7f747b274ec5  (unknown)
+    @           0x409c0b  (unknown)
+    @              (nil)  (unknown)
+I1006 18:17:39.712152 25740 caffe.cpp:184] Using GPUs 0
+I1006 18:17:40.270812 25740 solver.cpp:54] Initializing solver from parameters: 
+test_iter: 1
+test_interval: 100
+base_lr: 0.01
+display: 100
+max_iter: 1000
+lr_policy: "fixed"
+momentum: 0.9
+solver_mode: GPU
+device_id: 0
+net: "full_batch_ce/model2_part3.prototxt"
+I1006 18:17:40.270843 25740 solver.cpp:97] Creating training net from net file: full_batch_ce/model2_part3.prototxt
+I1006 18:17:40.270985 25740 net.cpp:339] The NetState phase (0) differed from the phase (1) specified by a rule in layer data_layer
+I1006 18:17:40.271018 25740 net.cpp:50] Initializing net from parameters: 
+name: "full_batch_ce/model2_part3.prototxt"
+state {
+  phase: TRAIN
+}
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  include {
+    phase: TRAIN
+  }
+  data_param {
+    source: "lmdb/SCOREDATA.vina.balanced.part3.train"
+    batch_size: 40000
+    backend: LMDB
+    prefetch: 8
+  }
+}
+layer {
+  name: "hidden_sum_layer"
+  type: "InnerProduct"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "hidden_act_layer"
+  type: "Sigmoid"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
+}
+layer {
+  name: "output_sum_layer"
+  type: "InnerProduct"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "error_layer"
+  type: "SigmoidCrossEntropyLoss"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
+}
+F1006 18:17:40.271037 25740 insert_splits.cpp:35] Unknown bottom blob 'output_act_blob' (layer 'error_layer', bottom index 0)
+*** Check failure stack trace: ***
+    @     0x7fa5b65e5daa  (unknown)
+    @     0x7fa5b65e5ce4  (unknown)
+    @     0x7fa5b65e56e6  (unknown)
+    @     0x7fa5b65e8687  (unknown)
+    @     0x7fa5b6a4291e  caffe::InsertSplits()
+    @     0x7fa5b6a7db0b  caffe::Net<>::Init()
+    @     0x7fa5b6a801a5  caffe::Net<>::Net()
+    @     0x7fa5b6a1b38a  caffe::Solver<>::InitTrainNet()
+    @     0x7fa5b6a1c4cc  caffe::Solver<>::Init()
+    @     0x7fa5b6a1c7d9  caffe::Solver<>::Solver()
+    @           0x412945  caffe::GetSolver<>()
+    @           0x40b626  train()
+    @           0x409471  main
+    @     0x7fa5b5308ec5  (unknown)
+    @           0x409c0b  (unknown)
+    @              (nil)  (unknown)
+I1006 18:17:40.378399 25746 caffe.cpp:184] Using GPUs 0
+I1006 18:17:40.939836 25746 solver.cpp:54] Initializing solver from parameters: 
+test_iter: 1
+test_interval: 100
+base_lr: 0.01
+display: 100
+max_iter: 1000
+lr_policy: "fixed"
+momentum: 0.9
+solver_mode: GPU
+device_id: 0
+net: "full_batch_ce/model2_part6.prototxt"
+I1006 18:17:40.939869 25746 solver.cpp:97] Creating training net from net file: full_batch_ce/model2_part6.prototxt
+I1006 18:17:40.940011 25746 net.cpp:339] The NetState phase (0) differed from the phase (1) specified by a rule in layer data_layer
+I1006 18:17:40.940044 25746 net.cpp:50] Initializing net from parameters: 
+name: "full_batch_ce/model2_part6.prototxt"
+state {
+  phase: TRAIN
+}
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  include {
+    phase: TRAIN
+  }
+  data_param {
+    source: "lmdb/SCOREDATA.vina.balanced.part6.train"
+    batch_size: 40000
+    backend: LMDB
+    prefetch: 8
+  }
+}
+layer {
+  name: "hidden_sum_layer"
+  type: "InnerProduct"
+  bottom: "data_blob"
+  top: "hidden_sum_blob"
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "hidden_act_layer"
+  type: "Sigmoid"
+  bottom: "hidden_sum_blob"
+  top: "hidden_act_blob"
+}
+layer {
+  name: "output_sum_layer"
+  type: "InnerProduct"
+  bottom: "hidden_act_blob"
+  top: "output_sum_blob"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "error_layer"
+  type: "SigmoidCrossEntropyLoss"
+  bottom: "output_act_blob"
+  bottom: "label_blob"
+  top: "error_blob"
+}
+F1006 18:17:40.940063 25746 insert_splits.cpp:35] Unknown bottom blob 'output_act_blob' (layer 'error_layer', bottom index 0)
+*** Check failure stack trace: ***
+    @     0x7f96d3bdddaa  (unknown)
+    @     0x7f96d3bddce4  (unknown)
+    @     0x7f96d3bdd6e6  (unknown)
+    @     0x7f96d3be0687  (unknown)
+    @     0x7f96d403a91e  caffe::InsertSplits()
+    @     0x7f96d4075b0b  caffe::Net<>::Init()
+    @     0x7f96d40781a5  caffe::Net<>::Net()
+    @     0x7f96d401338a  caffe::Solver<>::InitTrainNet()
+    @     0x7f96d40144cc  caffe::Solver<>::Init()
+    @     0x7f96d40147d9  caffe::Solver<>::Solver()
+    @           0x412945  caffe::GetSolver<>()
+    @           0x40b626  train()
+    @           0x409471  main
+    @     0x7f96d2900ec5  (unknown)
+    @           0x409c0b  (unknown)
+    @              (nil)  (unknown)

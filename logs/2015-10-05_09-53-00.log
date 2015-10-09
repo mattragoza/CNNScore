@@ -1,0 +1,28 @@
+I1005 09:53:00.037086 14057 caffe.cpp:184] Using GPUs 0
+I1005 09:53:00.612704 14057 solver.cpp:54] Initializing solver from parameters: 
+base_lr: 0.01
+display: 100
+max_iter: 10000
+lr_policy: "fixed"
+momentum: 0.9
+solver_mode: GPU
+device_id: 0
+net: "basic/model0_full.prototxt"
+I1005 09:53:00.612732 14057 solver.cpp:97] Creating training net from net file: basic/model0_full.prototxt
+[libprotobuf ERROR google/protobuf/text_format.cc:245] Error parsing text-format caffe.NetParameter: 14:3: Expected identifier.
+F1005 09:53:00.612829 14057 upgrade_proto.cpp:928] Check failed: ReadProtoFromTextFile(param_file, param) Failed to parse NetParameter file: basic/model0_full.prototxt
+*** Check failure stack trace: ***
+    @     0x7f64f4699daa  (unknown)
+    @     0x7f64f4699ce4  (unknown)
+    @     0x7f64f46996e6  (unknown)
+    @     0x7f64f469c687  (unknown)
+    @     0x7f64f4b014be  caffe::ReadNetParamsFromTextFileOrDie()
+    @     0x7f64f4acf3bb  caffe::Solver<>::InitTrainNet()
+    @     0x7f64f4ad04cc  caffe::Solver<>::Init()
+    @     0x7f64f4ad07d9  caffe::Solver<>::Solver()
+    @           0x412945  caffe::GetSolver<>()
+    @           0x40b626  train()
+    @           0x409471  main
+    @     0x7f64f33bcec5  (unknown)
+    @           0x409c0b  (unknown)
+    @              (nil)  (unknown)

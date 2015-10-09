@@ -1,0 +1,12 @@
+[libprotobuf ERROR google/protobuf/text_format.cc:245] Error parsing text-format caffe.SolverParameter: 3:1: Expected identifier.
+F1002 18:14:20.614542  3621 io.hpp:50] Check failed: ReadProtoFromTextFile(filename, proto) 
+*** Check failure stack trace: ***
+    @     0x7f850c96bdaa  (unknown)
+    @     0x7f850c96bce4  (unknown)
+    @     0x7f850c96b6e6  (unknown)
+    @     0x7f850c96e687  (unknown)
+    @           0x40bd91  train()
+    @           0x409471  main
+    @     0x7f850b68eec5  (unknown)
+    @           0x409c0b  (unknown)
+    @              (nil)  (unknown)
