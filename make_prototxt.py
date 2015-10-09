@@ -30,8 +30,12 @@ def write_prototxt(data_name, model_temp, solver_temp, output_dir, id_):
     solver_name = os.path.basename(solver_temp.name).replace("TEMPLATE", id_)
     solver_name = os.path.join(output_dir, solver_name)
 
+    output_name = os.path.basename(model_temp.name).replace("TEMPLATE", id_)
+    output_prefix = os.path.join(output_dir, output_name)
+
     model  = model_temp.contents.replace("$model_name", model_name, 1)
     solver = solver_temp.contents.replace("$model_name", model_name, 1)
+    solver = solver_temp.contents.replace("$output_prefix", output_prefix, 1)
 
     if id_ == "full": # train on entire set, no test phase
         full_lmdb = data_name+".full"

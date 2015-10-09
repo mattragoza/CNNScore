@@ -13,3 +13,6 @@ power: 2
 display: 100
 max_iter: 5000
 solver_mode: GPU
+
+snapshot_prefix: "$output_prefix"
+snapshot_after_train: true

@@ -1,7 +1,7 @@
 net: "$model_name"
 
-//test_iter: 10000
-//test_interval: 100000
+//test_iter: 500
+//test_interval: 10000
 
 base_lr: 0.01
 momentum: 0.9
@@ -11,3 +11,6 @@ lr_policy: "fixed"
 display: 10000
 max_iter: 1000000
 solver_mode: GPU
+
+snapshot_prefix: "$output_prefix"
+snapshot_after_train: true
