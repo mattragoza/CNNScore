@@ -1,6 +1,7 @@
 import sys
+import glob
 
-USAGE = "python parse_log.py <log_file>"
+USAGE = "python parse_log.py <file_pattern>"
 
 class Log:
 
@@ -30,7 +31,7 @@ class Log:
 			if tok[0] == "Solving":
 				solving = True
 				i = 0
-				train = [[], []]
+				train = [[], []] # iter, error
 				test  = [[], []]
 
 			if solving:
@@ -81,9 +82,10 @@ class Log:
 			csv += str(tr)
 
 			if te == tr: # a test iteration
-				full_model = True
+
 				for net in self._data:
-					if not full_model:
+
+					if len(net["test"][0]) > 0:
 						csv += "," + str(net["train"][1][i]) + "," + str(net["test"][1][j])
 					else:
 						csv += "," + str(net["train"][1][i]) + ","
@@ -110,18 +112,20 @@ if __name__ == "__main__":
 		print("Usage: " + USAGE)
 		sys.exit(1)
 
-	file_arg = sys.argv[usage_format.index("<log_file>")]
+	file_arg = sys.argv[usage_format.index("<file_pattern>")]
 
-	print("Reading from " + file_arg)
-	try: log = Log(file_=file_arg)
-	except IOError:
-		print("Error: could not access the input file")
-		sys.exit(1)
+	for log_file in glob.glob(file_arg):
 
-	print("Writing to " + file_arg + ".csv")
-	try: log.write_csv(file_=file_arg+".csv")
-	except IOError:
-		print("Error: could not access the output file")
-		sys.exit(1)
+		print("Reading from " + log_file)
+		try: log = Log(file_=log_file)
+		except IOError:
+			print("Error: could not access the input file")
+			sys.exit(1)
+
+		print("Writing to " + log_file + ".csv")
+		try: log.write_csv(file_=log_file+".csv")
+		except IOError:
+			print("Error: could not access the output file")
+			sys.exit(1)
 
 	print("Done, without errors.")
