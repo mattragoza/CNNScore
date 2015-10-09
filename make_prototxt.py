@@ -30,25 +30,25 @@ def write_prototxt(data_name, model_temp, solver_temp, output_dir, id_):
     solver_name = os.path.basename(solver_temp.name).replace("TEMPLATE", id_)
     solver_name = os.path.join(output_dir, solver_name)
 
-    output_name = os.path.basename(model_temp.name).replace("TEMPLATE", id_)
+    output_name = os.path.basename(model_temp.name).replace("TEMPLATE.prototxt", id_)
     output_prefix = os.path.join(output_dir, output_name)
 
-    model  = model_temp.contents.replace("$model_name", model_name, 1)
-    solver = solver_temp.contents.replace("$model_name", model_name, 1)
-    solver = solver_temp.contents.replace("$output_prefix", output_prefix, 1)
+    model  = model_temp.contents.replace("$model_name", model_name)
+    solver = solver_temp.contents.replace("$model_name", model_name)
+    solver = solver.replace("$output_prefix", output_prefix)
 
     if id_ == "full": # train on entire set, no test phase
         full_lmdb = data_name+".full"
-        model = model.replace("$train_lmdb", full_lmdb, 1)
-        model = model.replace("$test_lmdb",  full_lmdb, 1)
+        model = model.replace("$train_lmdb", full_lmdb)
+        model = model.replace("$test_lmdb",  full_lmdb)
         model = re.sub(r'//.*?\n|/\*.*?\*/', "", model, re.S)
         solver = re.sub(r'//.*?\n|/\*.*?\*/', "", solver, re.S)
 
     else: # cross-validation training and testing
         train_lmdb = data_name+"."+id_+".train"
         test_lmdb  = data_name+"."+id_+".test"
-        model = model.replace("$train_lmdb", train_lmdb, 1)
-        model = model.replace("$test_lmdb",  test_lmdb,  1)
+        model = model.replace("$train_lmdb", train_lmdb)
+        model = model.replace("$test_lmdb",  test_lmdb)
         model = model.replace("//", "") # uncomment lines relevant to testing
         solver = solver.replace("//", "")
 
