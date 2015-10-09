@@ -3,12 +3,12 @@ net: "$model_name"
 //test_iter: 1
 //test_interval: 100
 
-base_lr: 0.01
+base_lr: 0.1
 momentum: 0.9
 
 lr_policy: "inv"
-gamma: 0.001
-power: 1
+gamma: 0.0004
+power: 2
 
 display: 100
 max_iter: 10000
