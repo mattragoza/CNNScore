@@ -48,7 +48,7 @@ layer {
   name: "hidden_act_layer1"
   type: "Sigmoid"
   bottom: "hidden_sum_blob1"
-  top: "hidden_act_blob2"
+  top: "hidden_act_blob1"
 }
 
 layer {
@@ -58,7 +58,7 @@ layer {
   top: "hidden_sum_blob2"
 
   inner_product_param {
-    num_output: 10
+    num_output: 5
     weight_filler {
       type: "xavier"
     }
