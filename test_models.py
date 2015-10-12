@@ -20,9 +20,11 @@ if __name__ == "__main__":
         sys.exit(1)
 
     input_arg = sys.argv[usage_format.index("<input_pattern>")]
-    solver_glob = glob.glob(input_arg)
+    solver_glob = sorted(glob.glob(input_arg))
 
     caffe.set_mode_gpu()
+    mean_tpr = 0.0
+    mean_fpr = numpy.linspace(0, 1, 100)
     for solver_file in solver_glob:
 
         print("Parsing " + solver_file)
@@ -77,12 +79,36 @@ if __name__ == "__main__":
 
         fpr, tpr, thresholds = roc_curve(truth, score)
         roc_auc = auc(fpr, tpr)
-        model_label = os.path.basename(model_file).replace(".prototxt", "")
-        plt.plot(fpr, tpr, lw=1, label='%s (area = %0.2f)' % (model_label, roc_auc))
 
-    plt.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6), label='Luck')
+
+        model_label = os.path.basename(model_file).replace(".prototxt", "")
+        if "full.prototxt" in model_file:
+            plt.figure(1)
+            plt.plot(fpr, tpr, lw=1, label='%s (area = %0.2f)' % (model_label, roc_auc))
+        else:
+            mean_tpr += numpy.interp(mean_fpr, fpr, tpr)
+
+            plt.figure(2)
+            plt.plot(fpr, tpr, lw=1, label='%s (area = %0.2f)' % (model_label, roc_auc))
+
+    mean_tpr[0]  = 0.0
+    mean_tpr /= 10
+    mean_tpr[-1] = 1.0
+    mean_auc = auc(mean_fpr, mean_tpr)
+
+    plt.figure(1)
+    plt.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6), label='random guess')
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.title('Receiver operating characteristic')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    plt.savefig(deploy_file.replace("deploy.prototxt", "roc.png"))
+    lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.savefig(deploy_file.replace("deploy.prototxt", "testontrain-roc.png"), bbox_extra_artists=(lgd,), bbox_inches='tight')
+
+    plt.figure(2)
+    plt.plot(mean_fpr, mean_tpr, 'k--', label='mean (area = %0.2f)' % mean_auc, lw=2)
+    plt.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6), label='random guess')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver operating characteristic')
+    lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.savefig(deploy_file.replace("deploy.prototxt", "crossval-roc.png"), bbox_extra_artists=(lgd,), bbox_inches='tight')

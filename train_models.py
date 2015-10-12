@@ -15,7 +15,7 @@ if __name__ == "__main__":
     input_arg = sys.argv[usage_format.index("<input_pattern>")]
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    solver_glob = glob.glob(input_arg)
+    solver_glob = sorted(glob.glob(input_arg))
     for solver_file in solver_glob:
 
         command = "caffe train --solver="+solver_file + \
