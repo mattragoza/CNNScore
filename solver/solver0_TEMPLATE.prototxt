@@ -1,7 +1,9 @@
-net: "$model_name"
+net: "MODEL_NAME"
 
-//test_iter: 2
-//test_interval: 100
+<crossval>
+test_iter: 2
+test_interval: 100
+</crossval>
 
 base_lr: 0.01
 momentum: 0.9
@@ -12,5 +14,5 @@ display: 100
 max_iter: 10000
 solver_mode: GPU
 
-snapshot_prefix: "$output_prefix"
+snapshot_prefix: "OUTPUT_PREFIX"
 snapshot_after_train: true

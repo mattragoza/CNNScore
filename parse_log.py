@@ -61,10 +61,10 @@ class Log:
 		csv = ""
 		for net in self._data:
 			if len(net["test"][0]) > 0:
-				csv += ",part" + str(n-1) + ",part" + str(n-1)
+				csv += ",part" + str(n-1)
 			else:
-				csv += ",full,full"
-				
+				csv += ",full"
+
 		csv += "\niteration"
 		for n in self._data:
 			csv += ",train,test"
@@ -87,7 +87,7 @@ class Log:
 				for net in self._data:
 
 					if len(net["test"][0]) > 0:
-						csv += "," + str(net["train"][1][i]) + "," + str(net["test"][1][j])
+						csv += "," + str(net["test"][1][j])
 					else:
 						csv += "," + str(net["train"][1][i]) + ","
 						full_model = False
