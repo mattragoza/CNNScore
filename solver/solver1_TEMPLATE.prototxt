@@ -8,7 +8,9 @@ test_interval: 10000
 base_lr: 0.01
 momentum: 0.9
 
-lr_policy: "fixed"
+lr_policy: "inv"
+gamma: 0.000002
+power: 2
 
 display: 10000
 max_iter: 1000000
