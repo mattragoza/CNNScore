@@ -39,7 +39,7 @@ def write_prototxt(data_name, model_temp, solver_temp, output_dir, id_):
 
     if id_ == "deploy": # this is for using the model once it's trained
         model = model.replace("<deploy>", "").replace("</deploy>", "")
-        model = re.sub(r'<train>.*?</train>', "", model,  flags=re.DOTALL)
+        model = re.sub(r'<train>.*?</train>', "", model, flags=re.DOTALL)
 
     elif id_ == "full": # train on entire set, no test phase
         full_lmdb = data_name+".full"
@@ -48,8 +48,8 @@ def write_prototxt(data_name, model_temp, solver_temp, output_dir, id_):
 
         model = model.replace("<train>", "").replace("</train>", "")
         model = re.sub(r'<deploy>.*?</deploy>', "", model, flags=re.DOTALL)
-        model = re.sub(r'<crossval>.*?</crossval>', "", model,  flags=re.DOTALL)
-        solver = re.sub(r'<crossval>.*?</crossval>', "", solver,  flags=re.DOTALL)
+        model = re.sub(r'<crossval>.*?</crossval>', "", model, flags=re.DOTALL)
+        solver = re.sub(r'<crossval>.*?</crossval>', "", solver, flags=re.DOTALL)
 
     else: # cross-validation training and testing
         train_lmdb = data_name+"."+id_+".train"
@@ -58,7 +58,7 @@ def write_prototxt(data_name, model_temp, solver_temp, output_dir, id_):
         model = model.replace("TEST_LMDB",  test_lmdb)
 
         model = model.replace("<train>", "").replace("</train>", "")
-        model = re.sub(r'<deploy>.*?</deploy>', "", model,  flags=re.DOTALL)
+        model = re.sub(r'<deploy>.*?</deploy>', "", model, flags=re.DOTALL)
         model = model.replace("<crossval>", "").replace("</crossval>", "") # uncomment lines relevant to testing
         solver = solver.replace("<crossval>", "").replace("</crossval>", "")
 
@@ -67,7 +67,7 @@ def write_prototxt(data_name, model_temp, solver_temp, output_dir, id_):
     model_file.write(model)
     model_file.close()
 
-    if id_ != "deploy:":
+    if id_ != "deploy":
         solver_file = open(solver_name, "w")
         solver_file.write(solver)
         solver_file.close()

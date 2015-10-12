@@ -1,32 +1,47 @@
-name: "$model_name"
+name: "MODEL_NAME"
+<deploy>
+input: "data_blob"
+input_shape {
+  dim: 1
+  dim: 61
+  dim: 1
+  dim: 1
+}
+</deploy>
 
+<train>
 layer {
   name: "data_layer"
   type: "Data"
   top: "data_blob"
   top: "label_blob"
   data_param {
-    source: "$train_lmdb"
+    source: "TRAIN_LMDB"
     batch_size: 40000
     backend: LMDB
     prefetch: 8
   }
-//  include: { phase: TRAIN }
+<crossval>
+  include: { phase: TRAIN }
+</crossval>
 }
 
-//layer {
-//  name: "data_layer"
-//  type: "Data"
-//  top: "data_blob"
-//  top: "label_blob"
-//  data_param {
-//    source: "$test_lmdb"
-//    batch_size: 4000
-//    backend: LMDB
-//    prefetch: 8
-//  }
-//  include: { phase: TEST }
-//}
+<crossval>
+layer {
+  name: "data_layer"
+  type: "Data"
+  top: "data_blob"
+  top: "label_blob"
+  data_param {
+    source: "TEST_LMDB"
+    batch_size: 400
+    backend: LMDB
+    prefetch: 8
+  }
+  include: { phase: TEST }
+}
+</crossval>
+</train>
 
 layer {
   name: "hidden_sum_layer"
@@ -74,6 +89,7 @@ layer {
   top: "output_act_blob"
 }
 
+<train>
 layer {
   name: "error_layer"
   type: "EuclideanLoss"
@@ -81,3 +97,4 @@ layer {
   bottom: "label_blob"
   top: "error_blob"
 }
+</train>
