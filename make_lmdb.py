@@ -1,5 +1,6 @@
 import sys
 import os
+import argparse
 import csv
 import lmdb
 import caffe
@@ -15,7 +16,6 @@ CSV_FORMATS = {
     },
 }
 
-USAGE = "python make_lmdb.py <data_source>"
 
 
 
@@ -88,40 +88,39 @@ class Database:
 		for i in range(len(self._parts)):
 
 			partition  = self._parts[i]
+			n = partition._name
 
 			# we need to create train and test lmdbs
-			train_path = os.path.join(dir_, source_file+".part"+str(i)+".train")
-			test_path  = os.path.join(dir_, source_file+".part"+str(i)+".test")
-			
 			# open the memory mapped environment associated with each lmdb
-			train_lmdb = lmdb.open(train_path,  map_size=4*self.nbytes)
-			test_lmdb  = lmdb.open(test_path,   map_size=4*self.nbytes)
-
 			# writing training set data and labels
-			with train_lmdb.begin(write=True) as txn:
-				for s in partition.train_set():
-					datum = caffe.proto.caffe_pb2.Datum()
-					datum.channels = len(self._format["data"])
-					datum.height = 1
-					datum.width  = 1
-					datum.float_data.extend(s._data);
-					datum.label = s._label
-					txn.put(key=s._id.encode("ascii"), value=datum.SerializeToString())
 
-			# write test set data and labels
-			with test_lmdb.begin(write=True) as txn:
-				for s in partition.test_set():
-					datum = caffe.proto.caffe_pb2.Datum()
-					datum.channels = len(self._format["data"])
-					datum.height = 1
-					datum.width  = 1
-					datum.float_data.extend(s._data);
-					datum.label = s._label
-					txn.put(key=s._id.encode("ascii"), value=datum.SerializeToString())
+			if partition._train_set is not None:
+				train_path = os.path.join(dir_, source_file+"."+n+".train")
+				train_lmdb = lmdb.open(train_path, map_size=4*self.nbytes)
+				with train_lmdb.begin(write=True) as txn:
+					for s in partition.train_set():
+						datum = caffe.proto.caffe_pb2.Datum()
+						datum.channels = len(self._format["data"])
+						datum.height = 1
+						datum.width  = 1
+						datum.float_data.extend(s._data);
+						datum.label = s._label
+						txn.put(key=s._id.encode("ascii"), value=datum.SerializeToString())
+				train_lmdb.close()
 
-			# close the lmdb environments
-			train_lmdb.close()
-			test_lmdb.close()
+			if partition._test_set is not None:
+				test_path  = os.path.join(dir_, source_file+"."+n+".test")
+				test_lmdb  = lmdb.open(test_path, map_size=4*self.nbytes)
+				with test_lmdb.begin(write=True) as txn:
+					for s in partition.test_set():
+						datum = caffe.proto.caffe_pb2.Datum()
+						datum.channels = len(self._format["data"])
+						datum.height = 1
+						datum.width  = 1
+						datum.float_data.extend(s._data);
+						datum.label = s._label
+						txn.put(key=s._id.encode("ascii"), value=datum.SerializeToString())
+				test_lmdb.close()
 	
 	def balanced_partition(self, n):
 
@@ -148,7 +147,12 @@ class Database:
 		for i in range(n):
 			test_set = folds[i]
 			train_set = [j for f in folds[:i] for j in f] + [j for f in folds[i+1:] for j in f]
-			self._parts.append(Database.Partition(self, train_set, test_set))
+			self._parts.append(Database.Partition(self, "part"+str(i), train_set, test_set))
+
+	def split_by_target(self):
+
+		for g in self._groups:
+			self._parts.append(Database.Partition(self, g, None, [g]))
 
 
 	def normalize(self):
@@ -180,11 +184,14 @@ class Database:
 
 	class Partition:
 
-		def __init__(self, db, train, test):
+		def __init__(self, db, name, train, test):
 
 			self._db = db
-			self._train_set = set(train)
-			self._test_set  = set(test)
+			self._name = name
+			if train: self._train_set = set(train)
+			else: self._train_set = None
+			if test: self._test_set  = set(test)
+			else: self._test_set = None
 
 		def train_set(self):
 
@@ -215,15 +222,23 @@ class Database:
 
 if __name__ == "__main__":
 
-	usage_format = USAGE.strip("\n").split()[1:]
-	if len(sys.argv) < len(usage_format):
-		print("Usage: " + USAGE)
+	parser = argparse.ArgumentParser(
+		prog=__file__,
+		description='Convert a csv database into partitioned lmdb files.',
+		epilog=None)
+	parser.add_argument('INPUT_FILE')
+	parser.add_argument('OUTPUT_DIR')
+	parser.add_argument('--mode', '-m', type=str)
+	args = parser.parse_args()
+
+	if args.mode == "balanced":  mode = 0
+	elif args.mode == "targets": mode = 1
+	else:
+		print("Error: mode argument not recognized, try 'balanced' or 'targets'")
 		sys.exit(1)
 
-	file_arg   = sys.argv[usage_format.index("<data_source>")]
-
-	print("Gathering data from " + file_arg)
-	try: db = Database(file_arg, "DUDE_SCOREDATA")
+	print("Gathering data from " + args.INPUT_FILE)
+	try: db = Database(args.INPUT_FILE, "DUDE_SCOREDATA")
 	except IOError:
 		print("Error: could not access the input file")
 		sys.exit(1)
@@ -235,11 +250,15 @@ if __name__ == "__main__":
 	print("Normalizing data")
 	db.normalize()
 
-	print("Generating balanced partitions")
-	db.balanced_partition(n=10)
+	if mode == 0:
+		print("Generating balanced partitions")
+		db.balanced_partition(n=10)
+	elif mode == 1:
+		print("Splitting data by individual targets")
+		db.split_by_target()
 
 	print("Converting to lmdb format")
-	try: db.write_lmdb("lmdb/")
+	try: db.write_lmdb(args.OUTPUT_DIR)
 	except IOError:
 		print("Error: could not access the output location")
 		sys.exit(1)

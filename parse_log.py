@@ -58,16 +58,13 @@ class Log:
 
 		csv_file = open(file_, "w")
 
-		csv = ""
-		for net in self._data:
+		csv = "iteration"
+		for n in range(len(self._data)):
+			net = self._data[n]
 			if len(net["test"][0]) > 0:
 				csv += ",part" + str(n-1)
 			else:
 				csv += ",full"
-
-		csv += "\niteration"
-		for n in self._data:
-			csv += ",train,test"
 		csv += "\n"
 
 		# index in testing points
@@ -89,7 +86,7 @@ class Log:
 					if len(net["test"][0]) > 0:
 						csv += "," + str(net["test"][1][j])
 					else:
-						csv += "," + str(net["train"][1][i]) + ","
+						csv += "," + str(net["train"][1][i])
 						full_model = False
 
 				j += 1
