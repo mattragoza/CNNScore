@@ -23,12 +23,12 @@ if __name__ == "__main__":
 
 	solver_glob = sorted(glob.glob(args.SOLVER_PATTERN))
 
-	crossval_graph = False
-
 	caffe.set_mode_gpu()
 	mean_tpr = 0.0
 	mean_fpr = numpy.linspace(0, 1, 100)
-	for solver_file in solver_glob:
+	all_plot_data = []
+
+	for solver_file in sorted(solver_glob):
 
 		print("Parsing the model name and iterations from " + solver_file)
 		try: # parse the model name and max iterations from solver file
@@ -72,7 +72,7 @@ if __name__ == "__main__":
 
 		net = caffe.Net(deploy_file, weights_file, caffe.TEST)
 
-		for i in data_glob:
+		for i in sorted(data_glob):
 			print(i)
 			lmdb_env = lmdb.open(i)
 			lmdb_txn = lmdb_env.begin()
@@ -91,38 +91,55 @@ if __name__ == "__main__":
 
 			fpr, tpr, thresholds = roc_curve(truth, score)
 			roc_auc = auc(fpr, tpr)
+			data_label = os.path.basename(i).replace(".prototxt", "")
+			is_full_data = False
 
-
-			model_label = os.path.basename(i).replace(".prototxt", "")
-			if "full.prototxt" in model_file:
-				plt.figure(1)
-				plt.plot(fpr, tpr, lw=1, label='%s (area = %0.2f)' % (model_label, roc_auc))
+			if "full" in i:
+				is_full_data = True
 			else:
-				crossval_graph = True
 				mean_tpr += numpy.interp(mean_fpr, fpr, tpr)
 
-				plt.figure(2)
-				plt.plot(fpr, tpr, lw=1, label='%s (area = %0.2f)' % (model_label, roc_auc))
+			curr_plot_data = {"data_label":data_label, "roc_auc":roc_auc, "fpr":fpr, "tpr":tpr, "is_full_data":is_full_data}
+			all_plot_data.append(curr_plot_data)
 
+	# we now have the plot data, let's plot them
 
+	# plot the random guess line and label the axes
 	plt.figure(1)
 	plt.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6), label='random guess')
 	plt.xlabel('False Positive Rate')
 	plt.ylabel('True Positive Rate')
 	plt.title('Receiver operating characteristic')
-	lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-	plt.savefig(deploy_file.replace("deploy.prototxt", "testontrain-roc.png"), bbox_extra_artists=(lgd,), bbox_inches='tight')
 
-	if crossval_graph:
-		mean_tpr[0]  = 0.0
-		mean_tpr /= 10
-		mean_tpr[-1] = 1.0
-		mean_auc = auc(mean_fpr, mean_tpr)
-		plt.figure(2)
-		plt.plot(mean_fpr, mean_tpr, 'k--', label='mean (area = %0.2f)' % mean_auc, lw=2)
-		plt.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6), label='random guess')
-		plt.xlabel('False Positive Rate')
-		plt.ylabel('True Positive Rate')
-		plt.title('Receiver operating characteristic')
-		lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-		plt.savefig(deploy_file.replace("deploy.prototxt", "crossval-roc.png"), bbox_extra_artists=(lgd,), bbox_inches='tight')
+	plt.figure(2)
+	plt.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6), label='random guess')
+	plt.xlabel('False Positive Rate')
+	plt.ylabel('True Positive Rate')
+	plt.title('Receiver operating characteristic')
+
+	# sort the plots by area under curve
+	all_plot_data.sort(key=lambda curr_plot_data: curr_plot_data["roc_auc"], reverse=True)
+
+	# iterate through plot data and add to graphs, full data gets its own graph
+	for pd in all_plot_data:
+		if pd["is_full_data"]:
+			plt.figure(1)
+			plt.plot(pd["fpr"], pd["tpr"], lw=1, label='%s (area = %0.2f)' % (pd["data_label"], pd["roc_auc"]))
+		else:
+			plt.figure(2)
+			plt.plot(pd["fpr"], pd["tpr"], lw=1, label='%s (area = %0.2f)' % (pd["data_label"], pd["roc_auc"]))
+
+	# finally, add format/add the legend and save the graphs as .png
+	plt.figure(1)
+	lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+	plt.savefig(deploy_file.replace("deploy.prototxt", "full-roc.png"), bbox_extra_artists=(lgd,), bbox_inches='tight')
+
+	# figure 2, which is for the partitioned/split data, will have a mean line
+	plt.figure(2)
+	mean_tpr[0]  = 0.0
+	mean_tpr /= len(all_plot_data)
+	mean_tpr[-1] = 1.0
+	mean_auc = auc(mean_fpr, mean_tpr)
+	plt.plot(mean_fpr, mean_tpr, 'k--', label='mean (area = %0.2f)' % mean_auc, lw=2)
+	lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+	plt.savefig(deploy_file.replace("deploy.prototxt", "split-roc.png"), bbox_extra_artists=(lgd,), bbox_inches='tight')
