@@ -62,10 +62,13 @@ class Database:
 			else:
 				self._groups[s._group] = [s]
 		
+		csv_file.close()
+		
 		# get a *rough* estimate of the number of bytes of data, assuming float64
 		self.nbytes = 8 * len(self._format["data"]) * len(self._samples)
-		csv_file.close()
 
+		# shuffle the order of samples
+		self.randomize()
 
 	def write_lmdb(self, dir_):
 
@@ -97,6 +100,7 @@ class Database:
 			if partition._train_set is not None:
 				train_path = os.path.join(dir_, source_file+"."+n+".train")
 				train_lmdb = lmdb.open(train_path, map_size=4*self.nbytes)
+				print("\t" + train_path)
 				with train_lmdb.begin(write=True) as txn:
 					for s in partition.train_set():
 						datum = caffe.proto.caffe_pb2.Datum()
@@ -111,6 +115,7 @@ class Database:
 			if partition._test_set is not None:
 				test_path  = os.path.join(dir_, source_file+"."+n+".test")
 				test_lmdb  = lmdb.open(test_path, map_size=4*self.nbytes)
+				print("\t" + test_path)
 				with test_lmdb.begin(write=True) as txn:
 					for s in partition.test_set():
 						datum = caffe.proto.caffe_pb2.Datum()
@@ -182,6 +187,14 @@ class Database:
 				else:
 					i._data[j] = 0.0
 
+	def randomize(self):
+		
+		# shuffle the order of samples in the master list,
+		# and also in the dictionary of by-target groupings
+		random.shuffle(self._samples)
+		for group in self._groups:
+			random.shuffle(self._groups[group])
+
 	class Partition:
 
 		def __init__(self, db, name, train, test):
@@ -231,20 +244,20 @@ if __name__ == "__main__":
 	parser.add_argument('--mode', '-m', type=str)
 	args = parser.parse_args()
 
-	if args.mode == "balanced":  mode = 0
-	elif args.mode == "targets": mode = 1
+	if args.mode == "balanced_partitions": mode = 0
+	elif args.mode == "split_by_target": mode = 1
 	else:
-		print("Error: mode argument not recognized, try 'balanced' or 'targets'")
-		sys.exit(1)
+		print("Error: mode argument not recognized, try 'balanced_partitions' or 'split_by_target'")
+		exit(1)
 
 	print("Gathering data from " + args.INPUT_FILE)
 	try: db = Database(args.INPUT_FILE, "DUDE_SCOREDATA")
 	except IOError:
 		print("Error: could not access the input file")
-		sys.exit(1)
+		exit(1)
 	except KeyError:
 		print("Error: unknown input file format")
-		sys.exit(1)
+		exit(1)
 	print(str(db.nbytes) + " bytes read")
 
 	print("Normalizing data")
@@ -261,7 +274,6 @@ if __name__ == "__main__":
 	try: db.write_lmdb(args.OUTPUT_DIR)
 	except IOError:
 		print("Error: could not access the output location")
-		sys.exit(1)
+		exit(1)
 
 	print("Done, without errors.")
-	sys.exit(0)

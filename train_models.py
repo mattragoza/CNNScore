@@ -2,20 +2,21 @@ import sys
 import os
 import glob
 import datetime
-
-USAGE = "python train_models.py <input_pattern>"
+import argparse
 
 if __name__ == "__main__":
 
-    usage_format = USAGE.split()[1:]
-    if len(sys.argv) < len(usage_format):
-        print("Usage: " + USAGE)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        prog=__file__,
+        description='Train caffe models specified in a glob of solver files.',
+        epilog=None)
+    parser.add_argument('SOLVER_PATTERN')
+    args = parser.parse_args()
 
-    input_arg = sys.argv[usage_format.index("<input_pattern>")]
+    solver_arg = args.SOLVER_PATTERN
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    solver_glob = sorted(glob.glob(input_arg))
+    solver_glob = sorted(glob.glob(solver_arg))
     for solver_file in solver_glob:
 
         command = "caffe train --solver="+solver_file + \
