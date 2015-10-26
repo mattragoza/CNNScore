@@ -13,7 +13,7 @@ gamma: 0.000002
 power: 2
 
 display: 10000
-max_iter: 1000000
+max_iter: 400000
 solver_mode: GPU
 
 snapshot_prefix: "OUTPUT_PREFIX"
