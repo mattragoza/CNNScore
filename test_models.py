@@ -140,6 +140,6 @@ if __name__ == "__main__":
 	mean_tpr /= len(all_plot_data)
 	mean_tpr[-1] = 1.0
 	mean_auc = auc(mean_fpr, mean_tpr)
-	plt.plot(mean_fpr, mean_tpr, 'k--', label='mean (area = %0.2f)' % mean_auc, lw=2)
+	plt.plot(mean_fpr, mean_tpr, 'k--', label='mean (area = %0.2f)' % mean_auc, lw=2) # add the mean curve last so it's on top
 	lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 	plt.savefig(deploy_file.replace("deploy.prototxt", "split-roc.png"), bbox_extra_artists=(lgd,), bbox_inches='tight')
