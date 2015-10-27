@@ -50,25 +50,26 @@ class Database:
 		self._groups = {}
 		self._parts = []
 
-		# create a Database.Sample() object for each row in the csv_file
+		# create a dict for each row in the csv_file
 		# also keep track of all groups present in the data in a set()
 		for row in csv_reader:
-			s = Database.Sample(self, row[csv_format["id"]], row[csv_format["group"]],
-				               [float(row[i]) for i in csv_format["data"]], int(row[csv_format["label"]]))
+			s= {"id": row[csv_format["id"]], "group": row[csv_format["group"]],
+				"x": [float(row[i]) for i in csv_format["data"]],
+				"y": int(row[csv_format["label"]])}
+
+			# append to master data list
 			self._samples.append(s)
 
-			if s._group in self._groups:
-				self._groups[s._group].append(s)
+			# also append to the dictionary of samples grouped by target
+			if s["group"] in self._groups:
+				self._groups[s["group"]].append(s)
 			else:
-				self._groups[s._group] = [s]
+				self._groups[s["group"]] = [s]
 		
 		csv_file.close()
 		
 		# get a *rough* estimate of the number of bytes of data, assuming float64
 		self.nbytes = 8 * len(self._format["data"]) * len(self._samples)
-
-		# shuffle the order of samples
-		self.randomize()
 
 	def write_lmdb(self, dir_):
 
@@ -82,9 +83,9 @@ class Database:
 				datum.channels = len(self._format["data"])
 				datum.height = 1
 				datum.width  = 1
-				datum.float_data.extend(s._data);
-				datum.label = s._label
-				txn.put(key=s._id.encode("ascii"), value=datum.SerializeToString())
+				datum.float_data.extend(s["x"]);
+				datum.label = s["y"]
+				txn.put(key=s["id"].encode("ascii"), value=datum.SerializeToString())
 		full_lmdb.close()
 
 		# for each partition in the database
@@ -107,9 +108,9 @@ class Database:
 						datum.channels = len(self._format["data"])
 						datum.height = 1
 						datum.width  = 1
-						datum.float_data.extend(s._data);
-						datum.label = s._label
-						txn.put(key=s._id.encode("ascii"), value=datum.SerializeToString())
+						datum.float_data.extend(s["x"]);
+						datum.label = s["y"]
+						txn.put(key=s["id"].encode("ascii"), value=datum.SerializeToString())
 				train_lmdb.close()
 
 			if partition._test_set is not None:
@@ -122,11 +123,12 @@ class Database:
 						datum.channels = len(self._format["data"])
 						datum.height = 1
 						datum.width  = 1
-						datum.float_data.extend(s._data);
-						datum.label = s._label
-						txn.put(key=s._id.encode("ascii"), value=datum.SerializeToString())
+						datum.float_data.extend(s["x"]);
+						datum.label = s["y"]
+						txn.put(key=s["id"].encode("ascii"), value=datum.SerializeToString())
 				test_lmdb.close()
 	
+
 	def balanced_partition(self, n):
 
 		# sort the groups in a list based on number of samples
@@ -169,23 +171,23 @@ class Database:
 		mean = [0 for i in range(d)]
 		for i in self._samples:
 			for j in range(d):
-				mean[j] += i._data[j]
+				mean[j] += i["x"][j]
 		mean = [i/n for i in mean]
 
 		# compute standard deviation for each feature
 		sd = [0 for i in range(d)]
 		for i in self._samples:
 			for j in range(d):
-				sd[j] += (i._data[j] - mean[j])**2
+				sd[j] += (i["x"][j] - mean[j])**2
 		sd = [(i/n)**(0.5) for i in sd]
 
 		# normalize each feature- subtract mean, divide by std dev		
 		for i in self._samples:
 			for j in range(d):
 				if sd[j]:
-					i._data[j] = (i._data[j] - mean[j])/float(sd[j])
+					i["x"][j] = (i["x"][j] - mean[j])/float(sd[j])
 				else:
-					i._data[j] = 0.0
+					i["x"][j] = 0.0
 
 	def randomize(self):
 		
@@ -209,24 +211,14 @@ class Database:
 		def train_set(self):
 
 			for s in self._db._samples:
-				if s._group in self._train_set:
+				if s["group"] in self._train_set:
 					yield s
 
 		def test_set(self):
 
 			for s in self._db._samples:
-				if s._group in self._test_set:
+				if s["group"] in self._test_set:
 					yield s
-
-
-	class Sample:
-
-		def __init__(self, db, id_, group, data, label):
-
-			self._id    = id_
-			self._group = group
-			self._data  = data
-			self._label = label
 
 
 
@@ -244,8 +236,10 @@ if __name__ == "__main__":
 	parser.add_argument('--mode', '-m', type=str)
 	args = parser.parse_args()
 
-	if args.mode == "balanced_partitions": mode = 0
-	elif args.mode == "split_by_target": mode = 1
+	if args.mode == "balanced_partitions":
+		mode = 0
+	elif args.mode == "split_by_target":
+		mode = 1
 	else:
 		print("Error: mode argument not recognized, try 'balanced_partitions' or 'split_by_target'")
 		exit(1)
@@ -260,8 +254,9 @@ if __name__ == "__main__":
 		exit(1)
 	print(str(db.nbytes) + " bytes read")
 
-	print("Normalizing data")
+	print("Normalizing and shuffling data")
 	db.normalize()
+	db.randomize()
 
 	if mode == 0:
 		print("Generating balanced partitions")
