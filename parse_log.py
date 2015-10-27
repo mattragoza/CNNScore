@@ -1,5 +1,9 @@
+import matplotlib
+matplotlib.use('Agg')
 import sys
 import glob
+import matplotlib.pyplot as plt
+
 
 USAGE = "python parse_log.py <file_pattern>"
 
@@ -29,8 +33,10 @@ class Log:
 			tok = e.split()
 
 			if tok[0] == "Solving":
+
 				solving = True
 				i = 0
+				name = tok[1]
 				train = [[], []] # iter, error
 				test  = [[], []]
 
@@ -51,8 +57,24 @@ class Log:
 
 				if tok[0] == "Optimization":
 					solving = False
-					self._data.append({"train":train, "test":test})
+					self._data.append({"model":name, "train":train, "test":test})
 					n += 1
+
+	def write_plot(self, file_):
+
+		plt.figure(1)
+		plt.xlabel('Iterations')
+		plt.ylabel('Euclidean Error')
+		plt.title('Neural net training')
+		for i in self._data:
+			if i["train"]:
+				plt.plot(i["train"][0], i["train"][1], lw=1, label=i["model"]+".train")
+			if i["test"]:
+				plt.plot(i["train"][0], i["train"][1], lw=1, label=i["model"]+".test")
+		
+
+		lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+		plt.savefig(file_, bbox_extra_artists=(lgd,), bbox_inches='tight')
 
 	def write_csv(self, file_):
 
@@ -121,7 +143,7 @@ if __name__ == "__main__":
 			sys.exit(1)
 
 		print("Writing to " + log_file + ".csv")
-		try: log.write_csv(file_=log_file+".csv")
+		try: log.write_plot(file_=log_file+".png")
 		except IOError:
 			print("Error: could not access the output file")
 			sys.exit(1)

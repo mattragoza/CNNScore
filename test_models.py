@@ -9,6 +9,7 @@ import numpy
 import re
 from sklearn.metrics import roc_curve, auc
 import matplotlib.pyplot as plt
+matplotlib.use('Agg')
 import argparse
 
 if __name__ == "__main__":
@@ -43,8 +44,8 @@ if __name__ == "__main__":
 		except IOError:
 			print("Error: couldn't access a solver file for testing")
 			sys.exit(1)
-		print("net: " + model_file)
-		print("max_iter: " + str(max_iter))
+		print("\tnet: " + model_file)
+		print("\tmax_iter: " + str(max_iter))
 
 
 		if args.data_pattern is None:
@@ -59,16 +60,17 @@ if __name__ == "__main__":
 			except IOError:
 				print("Error: couldn't access a model file for testing")
 				sys.exit(1)
-			print("test source: " + data_file)
+			print("\ttest source: " + data_file)
 			data_glob = glob.glob(data_file)
 		else:
 			print("Gathering the test data matching the pattern " + args.data_pattern)
 			data_glob = glob.glob(args.data_pattern)
 
-		deploy_file = re.sub(r"_part.*?.prototxt", "_deploy.prototxt", model_file)
-		deploy_file = re.sub("_full.prototxt", "_deploy.prototxt", deploy_file)
+		deploy_file = re.sub(r"_part.*?.model.prototxt", "_deploy.model.prototxt", model_file)
+		deploy_file = re.sub("_full.model.prototxt", "_deploy.model.prototxt", deploy_file)
 
-		weights_file = model_file.replace(".prototxt", "_iter_"+str(max_iter)+".caffemodel")
+		weights_file = model_file.replace(".model.prototxt", "_iter_"+str(max_iter)+".caffemodel")
+		print("Testing " + deploy_file + " with weights from " + weights_file)
 
 		net = caffe.Net(deploy_file, weights_file, caffe.TEST)
 
@@ -132,14 +134,14 @@ if __name__ == "__main__":
 	# finally, add format/add the legend and save the graphs as .png
 	plt.figure(1)
 	lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-	plt.savefig(deploy_file.replace("deploy.prototxt", "full-roc.png"), bbox_extra_artists=(lgd,), bbox_inches='tight')
+	plt.savefig(deploy_file.replace("deploy.model.prototxt", "full-roc.png"), bbox_extra_artists=(lgd,), bbox_inches='tight')
 
 	# figure 2, which is for the partitioned/split data, will have a mean line
 	plt.figure(2)
 	mean_tpr[0]  = 0.0
-	mean_tpr /= len(all_plot_data)
+	mean_tpr /= len(all_plot_data)-1
 	mean_tpr[-1] = 1.0
 	mean_auc = auc(mean_fpr, mean_tpr)
 	plt.plot(mean_fpr, mean_tpr, 'k--', label='mean (area = %0.2f)' % mean_auc, lw=2) # add the mean curve last so it's on top
 	lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-	plt.savefig(deploy_file.replace("deploy.prototxt", "split-roc.png"), bbox_extra_artists=(lgd,), bbox_inches='tight')
+	plt.savefig(deploy_file.replace("deploy.model.prototxt", "split-roc.png"), bbox_extra_artists=(lgd,), bbox_inches='tight')

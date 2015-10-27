@@ -30,12 +30,12 @@ class Template:
 
 def write_prototxt(data_prefix, model_temp, solver_temp, output_dir, id_):
 
-	# to get this model's name, replace TEMPLATE in model template name with the model id
-	model_name = os.path.basename(model_temp.name).replace("TEMPLATE", id_)
+	# to get this model's name, replace TEMPLATE in model template name with id_.model
+	model_name = os.path.basename(model_temp.name).replace("TEMPLATE", id_ + ".model")
 	model_name = os.path.join(output_dir, model_name)
 
-	# to get the model solver's name, repalce TEMPLATE in solver template name with model id
-	solver_name = os.path.basename(solver_temp.name).replace("TEMPLATE", id_)
+	# to get the model solver's name, repalce TEMPLATE in model template with id_.solver
+	solver_name = os.path.basename(model_temp.name).replace("TEMPLATE", id_ + ".solver")
 	solver_name = os.path.join(output_dir, solver_name)
 
 	# output prefix says where to put the trained weights file, specified in the solver
