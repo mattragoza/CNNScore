@@ -5,7 +5,7 @@ test_iter: 1
 test_interval: 50
 </crossval>
 
-base_lr: 0.02
+base_lr: 0.01
 momentum: 0.9
 
 lr_policy: "inv"
