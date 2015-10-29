@@ -131,8 +131,8 @@ if __name__ == "__main__":
 		print("Generating prototxt for " + i)
 		write_prototxt(None, model_temp, solver_temp, args.OUTPUT_DIRECTORY, "deploy") # deploy is for using the trained weights
 		write_prototxt(args.DATA_PREFIX, model_temp, solver_temp, args.OUTPUT_DIRECTORY, "full") 
-		for i in range(10):
-			write_prototxt(args.DATA_PREFIX, model_temp, solver_temp, args.OUTPUT_DIRECTORY, "part"+str(i))
+		for j in range(10):
+			write_prototxt(args.DATA_PREFIX, model_temp, solver_temp, args.OUTPUT_DIRECTORY, "part"+str(j))
 
 	print("Done, without errors.")
 
