@@ -5,7 +5,6 @@ import glob
 import matplotlib.pyplot as plt
 
 
-USAGE = "python parse_log.py <file_pattern>"
 
 class Log:
 
@@ -127,10 +126,10 @@ class Log:
 
 if __name__ == "__main__":
 
-	usage_format = USAGE.split()[1:]
-	if len(sys.argv) < len(usage_format):
-		print("Usage: " + USAGE)
-		sys.exit(1)
+	# TODO
+	# read caffe training output from a pipe
+	# send an early-stop signal to caffe process
+	# when some error criteria is met... what criteria?
 
 	file_arg = sys.argv[usage_format.index("<file_pattern>")]
 

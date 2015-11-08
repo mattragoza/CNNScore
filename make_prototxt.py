@@ -6,22 +6,23 @@ import glob
 
 
 
-class Template:
+class PrototxtTemplate:
 
-	"""Template is a container for a TEMPLATE.prototxt file.
-
-	Keep track of the filename, and a string buffer of its contents.
-	"""
+	'''PrototxtTemplate is a container for a TEMPLATE.prototxt file,
+	keeping track of the filename and a string buffer of its contents.
+	Also provides an interface for modifying placeholders and tagged
+	regions of the template.'''
 
 	def __init__(self, file_):
 
-		if file_ is not None:
-			self.read_file(file_)
-		else:
-			self.name = None
-			self.contents = None
+		'''Construct a PrototxtTemplate using a path to the TEMPLATE.prototxt file.'''
+
+		self.read_file(file_)
+
 
 	def read_file(self, file_):
+
+		'''Read in the entire contents of a file.'''
 
 		with open(file_) as f:
 			self.name = file_
@@ -30,11 +31,14 @@ class Template:
 
 def write_prototxt(data_prefix, model_temp, solver_temp, output_dir, id_):
 
-	# to get this model's name, replace TEMPLATE in model template name with id_.model
+	'''Uses model and solver PrototxtTemplates and a prefix for an lmdb-format
+	database to generate the appropriate .prototxt files in the output directory.'''
+
+	# to get this model's name, replace TEMPLATE in model template name with "id_.model"
 	model_name = os.path.basename(model_temp.name).replace("TEMPLATE", id_ + ".model")
 	model_name = os.path.join(output_dir, model_name)
 
-	# to get the model solver's name, repalce TEMPLATE in model template with id_.solver
+	# to get the model solver's name, replace TEMPLATE in model template with "id_.solver"
 	solver_name = os.path.basename(model_temp.name).replace("TEMPLATE", id_ + ".solver")
 	solver_name = os.path.join(output_dir, solver_name)
 
@@ -120,14 +124,14 @@ if __name__ == "__main__":
 	for i in model_temp_glob: print("\t" + i)
 
 	print("Solver template:")
-	solver_temp = Template(args.SOLVER_TEMPLATE_FILE)
+	solver_temp = PrototxtTemplate(args.SOLVER_TEMPLATE_FILE)
 	print("\t" + solver_temp.name)
 
 	print("Using dataset:")
 	print("\t" + args.DATA_PREFIX)
 
 	for i in model_temp_glob:
-		model_temp = Template(i)
+		model_temp = PrototxtTemplate(i)
 		print("Generating prototxt for " + i)
 		write_prototxt(None, model_temp, solver_temp, args.OUTPUT_DIRECTORY, "deploy") # deploy is for using the trained weights
 		write_prototxt(args.DATA_PREFIX, model_temp, solver_temp, args.OUTPUT_DIRECTORY, "full") 

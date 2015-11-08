@@ -2,7 +2,7 @@ net: "MODEL_NAME"
 
 <crossval>
 test_iter: 1
-test_interval: 50
+test_interval: 100
 </crossval>
 
 base_lr: 0.01
@@ -12,7 +12,7 @@ lr_policy: "inv"
 gamma: 0.0004
 power: 2
 
-display: 50
+display: 100
 max_iter: 10000
 solver_mode: GPU
 

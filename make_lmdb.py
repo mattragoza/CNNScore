@@ -6,61 +6,71 @@ import lmdb
 import caffe
 import random
 
+# specify csv-type file formats here
 CSV_FORMATS = {
     "DUDE_SCOREDATA": {
     	"delimiter":' ',
-        "id":2,
-        "group":1,
-        "data":list(range(4, 65)),
-        "label":0
+        "id":2,                     # column specifying sample id
+        "group":1,                  # column specifying target 
+        "data":list(range(4, 65)),  # list of columns specifying input features
+        "label":0                   # column specifying the class label
     },
 }
 
+# global variables for data partitioning mode
+BALANCED_PARTITION = 0
+SPLIT_BY_TARGET = 1
 
 
 
 class Database:
 
-	def __init__(self, file_=None, format_=None):
+	'''This class is used for reading in data from a csv file and
+	performing preprocessing steps, such as normalization, shuffling
+	the sample order, and generating partitions for	cross-validation.
+	It can also write the data out in lmdb format.'''
 
-		if file_ is not None and format_ is not None:
-			self.read_csv(file_, format_)
+	def __init__(self, file_, format_):
 
-		else:
-			self._source = None
-			self._format = None
+		'''Construct a Database using a path to a csv file and a
+		string specifying the csv format, which is used to lookup
+		the format in the CSV_FORMATS global dictionary.'''
 
-			self._samples = []
-			self._groups  = {}
-			self._parts = []
-
-			self.nbytes = 0
+		self.read_csv(file_, format_)
 
 
 	def read_csv(self, file_, format_):
 
-		# parse the csv_file in a known format
+		'''Reads data from a csv file in the specified format into
+		the Database, overwriting any previous data it contained.'''
+
+		# open csv file in a known format
 		csv_file   = open(file_, "r")
-		csv_format = CSV_FORMATS[format_]
+		csv_format = CSV_FORMATS[format_] # throws KeyError if unknown format
 		csv_reader = csv.reader(csv_file, delimiter=csv_format["delimiter"])
 
-		self._source = file_
-		self._format = csv_format
-		self._samples = []
-		self._groups = {}
-		self._parts = []
+		self._source = file_        # path to source file
+		self._format = csv_format   # format specification
+		self._samples = []          # list of data samples
+		self._groups = {}           # dictionary of grouped data samples
+		self._parts = []            # list of data partitions
 
-		# create a dict for each row in the csv_file
-		# also keep track of all groups present in the data in a set()
+		# each row in the csv file is parsed into a dictionary with keys for
+		# the sample id, sample group, list of features(x) and label(y)
+		# csv_format is used to parse the csv columns into these values
 		for row in csv_reader:
-			s= {"id": row[csv_format["id"]], "group": row[csv_format["group"]],
-				"x": [float(row[i]) for i in csv_format["data"]],
-				"y": int(row[csv_format["label"]])}
 
-			# append to master data list
+			# parse the row into a dictionary
+			# throws IndexError if csv_format is incorrect
+			s = dict(id=row[csv_format["id"]],
+				     group=row[csv_format["group"]],
+				     x=[float(row[i]) for i in csv_format["data"]],
+				     y=int(row[csv_format["label"]])} 
+
+			# append sample to master sample list
 			self._samples.append(s)
 
-			# also append to the dictionary of samples grouped by target
+			# also append sample to the dictionary of grouped samples
 			if s["group"] in self._groups:
 				self._groups[s["group"]].append(s)
 			else:
@@ -68,10 +78,15 @@ class Database:
 		
 		csv_file.close()
 		
-		# get a *rough* estimate of the number of bytes of data, assuming float64
+		# get a *rough* estimate of the number of bytes of data
+		# assuming 64bit float values
 		self.nbytes = 8 * len(self._format["data"]) * len(self._samples)
 
+
 	def write_lmdb(self, dir_):
+
+		'''Writes out the entire dataset and each train/test partition in the
+		lmdb format.'''
 
 		# write the entire database
 		source_file = os.path.basename(self._source)
@@ -85,18 +100,16 @@ class Database:
 				datum.width  = 1
 				datum.float_data.extend(s["x"]);
 				datum.label = s["y"]
-				txn.put(key=s["id"].encode("ascii"), value=datum.SerializeToString())
+				txn.put(key=s["id"].encode("ascii"),
+					    value=datum.SerializeToString())
 		full_lmdb.close()
 
 		# for each partition in the database
 		for i in range(len(self._parts)):
-
 			partition  = self._parts[i]
 			n = partition._name
 
-			# we need to create train and test lmdbs
-			# open the memory mapped environment associated with each lmdb
-			# writing training set data and labels
+			# create lmdbs for train and test set, if they exist in the partition
 
 			if partition._train_set is not None:
 				train_path = os.path.join(dir_, source_file+"."+n+".train")
@@ -110,7 +123,8 @@ class Database:
 						datum.width  = 1
 						datum.float_data.extend(s["x"]);
 						datum.label = s["y"]
-						txn.put(key=s["id"].encode("ascii"), value=datum.SerializeToString())
+						txn.put(key=s["id"].encode("ascii"),
+							    value=datum.SerializeToString())
 				train_lmdb.close()
 
 			if partition._test_set is not None:
@@ -125,13 +139,21 @@ class Database:
 						datum.width  = 1
 						datum.float_data.extend(s["x"]);
 						datum.label = s["y"]
-						txn.put(key=s["id"].encode("ascii"), value=datum.SerializeToString())
+						txn.put(key=s["id"].encode("ascii"),
+							    value=datum.SerializeToString())
 				test_lmdb.close()
 	
 
-	def balanced_partition(self, n):
+	def balanced_partition(self, n=10):
 
-		# sort the groups in a list based on number of samples
+		'''Generates n Database.Partitions by iterating back and forth through 
+		the targets, trying to get 1/n of the entire dataset in each test set 
+		and (n-1)/n in each train set, while keeping all samples of the same 
+		target in the same set.'''
+
+		self._parts = []
+
+		# sort the groups based on number of samples
 		sorted_groups = [(g, len(self._groups[g])) for g in self._groups]
 		sorted_groups.sort(key=lambda tup: tup[1], reverse=True)
 
@@ -156,13 +178,23 @@ class Database:
 			train_set = [j for f in folds[:i] for j in f] + [j for f in folds[i+1:] for j in f]
 			self._parts.append(Database.Partition(self, "part"+str(i), train_set, test_set))
 
+
 	def split_by_target(self):
 
+		'''Generates a Database.Partition for each target. Does not specify a
+		training partition, because right now the whole dataset is used to 
+		train when testing individual targets.'''
+
+		self._parts = []
 		for g in self._groups:
 			self._parts.append(Database.Partition(self, g, None, [g]))
 
 
 	def normalize(self):
+
+		'''Normalize the sample data. This calculates the mean and standard
+		deviation of each input feature in the dataset, then for each sample
+		shifts and scales all of its features.'''
 
 		n = len(self._samples)
 		d = len(self._format["data"])
@@ -181,7 +213,7 @@ class Database:
 				sd[j] += (i["x"][j] - mean[j])**2
 		sd = [(i/n)**(0.5) for i in sd]
 
-		# normalize each feature- subtract mean, divide by std dev		
+		# normalize each feature: subtract mean, divide by std dev	
 		for i in self._samples:
 			for j in range(d):
 				if sd[j]:
@@ -189,17 +221,27 @@ class Database:
 				else:
 					i["x"][j] = 0.0
 
-	def randomize(self):
+
+	def shuffle(self):
+
+		'''Randomize the order of the samples in the master list,
+		and also within each list grouped by target.'''
 		
-		# shuffle the order of samples in the master list,
-		# and also in the dictionary of by-target groupings
 		random.shuffle(self._samples)
-		for group in self._groups:
-			random.shuffle(self._groups[group])
+		for i in self._groups:
+			random.shuffle(self._groups[i])
+
 
 	class Partition:
 
+		'''The Database.Partition class keeps track of a particular
+		partitioning of the grouped data into a train set and test set.'''
+
 		def __init__(self, db, name, train, test):
+
+			'''Contruct a Database.Partition by specifying the Database to
+			partition, a name for the partition, and a collection of the
+			names of the groups in the train and test set.'''
 
 			self._db = db
 			self._name = name
@@ -208,13 +250,21 @@ class Database:
 			if test: self._test_set  = set(test)
 			else: self._test_set = None
 
+
 		def train_set(self):
+
+			'''A generator function that yields samples from the Database
+			which are in a group that's in the train set.'''
 
 			for s in self._db._samples:
 				if s["group"] in self._train_set:
 					yield s
 
+
 		def test_set(self):
+
+			'''A generator function that yields samples from the Database
+			which are in a group taht's in the test set.'''
 
 			for s in self._db._samples:
 				if s["group"] in self._test_set:
@@ -237,9 +287,9 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 
 	if args.mode == "balanced_partitions":
-		mode = 0
+		mode = BALANCED_PARTITION
 	elif args.mode == "split_by_target":
-		mode = 1
+		mode = SPLIT_BY_TARGET
 	else:
 		print("Error: mode argument not recognized, try 'balanced_partitions' or 'split_by_target'")
 		exit(1)
@@ -252,23 +302,26 @@ if __name__ == "__main__":
 	except KeyError:
 		print("Error: unknown input file format")
 		exit(1)
+	except IndexError:
+		print("Error: incorrect input file format")
+		exit(1)
 	print(str(db.nbytes) + " bytes read")
 
 	print("Normalizing and shuffling data")
 	db.normalize()
-	db.randomize()
+	db.shuffle()
 
-	if mode == 0:
-		print("Generating balanced partitions")
-		db.balanced_partition(n=10)
-	elif mode == 1:
+	if mode == BALANCED_PARTITION:
+		print("Generating 10 balanced partitions")
+		db.balanced_partition()
+	elif mode == SPLIT_BY_TARGET:
 		print("Splitting data by individual targets")
 		db.split_by_target()
 
 	print("Converting to lmdb format")
 	try: db.write_lmdb(args.OUTPUT_DIR)
 	except IOError:
-		print("Error: could not access the output location")
+		print("Error: could not access output location")
 		exit(1)
 
 	print("Done, without errors.")
