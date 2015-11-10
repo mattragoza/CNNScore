@@ -92,7 +92,7 @@ layer {
 <train>
 layer {
   name: "error_layer"
-  type: "InfogainLoss"
+  type: "SoftmaxWithLoss"
   bottom: "output_act_blob"
   bottom: "label_blob"
   top: "error_blob"
