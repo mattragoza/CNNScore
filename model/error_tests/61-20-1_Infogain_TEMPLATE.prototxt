@@ -91,10 +91,19 @@ layer {
 
 <train>
 layer {
+  name: "softmax_layer"
+  type: "SoftmaxLayer"
+  bottom: "output_act_blob"
+  top: "softmax_blob"
+}
+layer {
   name: "error_layer"
   type: "InfogainLoss"
-  bottom: "output_act_blob"
+  bottom: "softmax_blob"
   bottom: "label_blob"
   top: "error_blob"
+  infogain_param {
+    source: "infogain_weights.binaryproto"
+  }
 }
 </train>
