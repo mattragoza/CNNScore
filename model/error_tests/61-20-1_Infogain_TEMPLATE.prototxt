@@ -19,7 +19,7 @@ layer {
     source: "TRAIN_LMDB"
     batch_size: 20000
     backend: LMDB
-    prefetch: 8
+    prefetch: 16
   }
 <crossval>
   include: { phase: TRAIN }
@@ -92,7 +92,7 @@ layer {
 <train>
 layer {
   name: "softmax_layer"
-  type: "SoftmaxLayer"
+  type: "Softmax"
   bottom: "output_act_blob"
   top: "softmax_blob"
 }

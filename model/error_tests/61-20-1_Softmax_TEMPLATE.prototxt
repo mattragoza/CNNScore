@@ -19,7 +19,7 @@ layer {
     source: "TRAIN_LMDB"
     batch_size: 20000
     backend: LMDB
-    prefetch: 8
+    prefetch: 16
   }
 <crossval>
   include: { phase: TRAIN }
