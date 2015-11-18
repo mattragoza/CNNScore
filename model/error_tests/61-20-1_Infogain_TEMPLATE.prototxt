@@ -103,7 +103,7 @@ layer {
   bottom: "label_blob"
   top: "error_blob"
   infogain_param {
-    source: "infogain_weights.binaryproto"
+    source: "data/SCOREDATA.vina.reduced_weightmatrix.binaryproto"
   }
 }
 </train>
