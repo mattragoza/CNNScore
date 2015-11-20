@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 import sys
 import os
 import re
@@ -7,8 +9,6 @@ import numpy as np
 import caffe
 import lmdb
 from sklearn.metrics import roc_curve, auc
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
@@ -16,23 +16,47 @@ class CaffeModel(object):
 
     '''CaffeModel represents a neural network model in Caffe. It also
     organizes the various prototxt and data files that are used for
-    training and testing/deploying a model.'''
+    training, testing, and using a model.'''
 
     def __init__(self):
 
+        # files for model training
         self.train_solver_file = None
         self.train_model_file = None
-        self.train_model_net = None
 
+        # train and test data specification
         self.train_data_file = None
         self.test_data_file = None
 
+        # files for model usage
         self.deploy_weight_file = None
         self.deploy_model_file = None
+        
+        self.train_model_net = None
         self.deploy_model_net = None
+
+    def setup_train(self):
+
+        '''Initialize the network in Caffe for training.'''
+
+        raise NotImplementedError()
+        self.train_model_net = caffe.Net(self.train_model_file,
+            None, caffe.TRAIN)
+
+    def setup_test(self):
+
+        '''Initialize the network in Caffe using trained weights.'''
+
+        self.deploy_model_net = caffe.Net(self.deploy_model_file,
+            self.deploy_weight_file, caffe.TEST)
 
     @staticmethod
     def from_solver_prototxt(solver_file):
+
+        '''Construct a CaffeModel by parsing a solver prototxt file.
+        Parses the training model from the \'net\' parameter, then
+        tries to parse the training model prototxt as well to get data
+        files specified for training and testing.'''
 
         self = CaffeModel()
         self._parse_solver_prototxt(solver_file)
@@ -40,55 +64,68 @@ class CaffeModel(object):
 
     def _parse_solver_prototxt(self, solver_file):
 
+        # read the solver file into a token buffer
         with open(solver_file, 'r') as solver_fp:
             solver = [i.lstrip().rstrip().split() for i in solver_fp]
 
+        # parse out the training model file and length of training
         for line in solver:
-            if line is None:
+            if not line:
                 continue
             elif line[0] == 'net:':
                 train_model_file = line[1].strip('"')
             elif line[0] == 'max_iter:':
                 max_iter = int(line[1])
 
+        # use training model and length of training to get
+        # the deploy model file and weights file
         deploy_model_file = re.sub(r'_part.*?.model|_full.model', \
             '_deploy.model', train_model_file)
         deploy_weight_file = re.sub('.model.prototxt', \
             '_iter_'+str(max_iter)+'.caffemodel', train_model_file)
 
+        # initialize the CaffeModel with the parsed data
         self.train_solver_file = solver_file
         self.train_model_file = train_model_file
-        self._parse_model_prototxt(train_model_file)
-
         self.deploy_model_file = deploy_model_file
         self.deploy_weight_file = deploy_weight_file
 
-    def _parse_model_prototxt(model_file=None):
+        # parse the training model to get data files
+        self._parse_model_prototxt(train_model_file)
 
-        if model_file is None:
-            model_file = self.train_model_file
+    def _parse_model_prototxt(self, model_file):
 
+        # read the model file into a token buffer
         with open(model_file, 'r') as model_fp:
             model = [i.lstrip().rstrip().split() for i in model_fp]
 
+        # getparse paths to data files from data_params in buffer
         data_files = []
-        for line in model:
-            if line is None:
+        model_iter = iter(model)
+        for line in model_iter:
+            if not line:
                 continue
-            elif line[0] == "source:":
-                data_files.append(line[1].strip("\""))
+            elif line[0] == 'data_param':
+                while line[0] != '}':
+                    if line[0] == 'source:':
+                        data_files.append(line[1].strip('"'))
+                    line = next(model_iter)
+                    continue
 
         # TODO need to handle this better
-        self.train_data_file = data_files[0]
-        self.test_data_file = data_files[1]
+        try:
+            self.train_data_file = data_files[0]
+            self.test_data_file = data_files[1]
+        except IndexError:
+            pass
 
-    def test_lmdb(data_file):
+    def test_lmdb(self, data_file):
 
         lmdb_env = lmdb.open(data_file)
         lmdb_txn = lmdb_env.begin()
         lmdb_cursor = lmdb_txn.cursor()
 
-        truths, scores = [], []
+        result = {'id':[], 'truth':[], 'score':[], 'num':0}
         for key, value in lmdb_cursor:
 
             datum = caffe.proto.caffe_pb2.Datum()
@@ -96,57 +133,186 @@ class CaffeModel(object):
             features = caffe.io.datum_to_array(datum)
 
             truth = datum.label
-            score = self.deploy_model_net.forward_all(data_blob=features)
-            score = score['output_act_blob'][0]
+            score = self.deploy_model_net.forward_all(data_blob=features.reshape(1, 61, 1, 1))
+            score = list(score['output_act_blob'][0])
 
-            truths.append(truth)
-            scores.append(score[-1])
+            result['id'].append(key)
+            result['truth'].append(truth)
+            result['score'].append(score)
+            result['num'] += 1
 
-        return truths, scores
+        return result
 
 def main(argv=sys.argv[1:]):
 
     args = parse_args(argv)
     caffe.set_mode_gpu()
 
-
     mean_tpr = 0.0
     mean_fpr = np.linspace(0, 1, 100)
     all_plot_data = []
+    plot_name = 'default'
 
     for s in sorted(glob(args.SOLVER_PATTERN)):
 
         nnet = CaffeModel.from_solver_prototxt(s)
         nnet.setup_test()
+        print('Using model trained by ' + str(s))
 
         if args.data_pattern is None:
-            data_glob = [nnet.test_data_file]
+            if nnet.test_data_file:
+                data_glob = [nnet.test_data_file]
+            elif nnet.train_data_file:
+                data_glob = [nnet.train_data_file]
+            else:
+                data_glob = []
         else:
             data_glob = glob(args.data_pattern)
 
-        for d in data_glob:
+        if args.output_prefix is None:
+            args.output_prefix = ''
 
-            truths, scores = nnet.test_lmdb(d)
-            fpr, tpr, thresholds = roc_curve(truths, scores)
+        if len(data_glob) == 0:
+            print('\tNo test data')
+            continue
+
+        for test_db in data_glob:
+            print('\tTesting on ' + str(test_db))
+            result = nnet.test_lmdb(test_db)
+
+            base_name = write_score_file(args.output_prefix, nnet, test_db, result)
+            if not args.roc:
+                continue
+
+            fpr, tpr, thresholds = roc_curve(result['truth'], [i[-1] for i in result['score']])
             roc_auc = auc(fpr, tpr)
-            data_label = os.path.basename(d).replace('.prototxt', '')
+            data_label = os.path.basename(test_db).replace('.prototxt', '')
             if 'full' in data_label:
-                is_full_data = True
+                plot_name.replace('full.solver.prototxt', '')
             else:
-                is_full_data = False
-                mean_tpr += numpy.interp(mean_fpr, fpr, tpr)
+                mean_tpr += np.interp(mean_fpr, fpr, tpr)
 
             plot_data = {'data_label':data_label,
                          'roc_auc':roc_auc,
                          'fpr':fpr,
-                         'tpr':tpr,
-                         'is_full_data':is_full_data}
+                         'tpr':tpr}
 
             all_plot_data.append(plot_data)
 
-    make_roc_plots(all_plot_data)
+    if not args.roc:
+        return 0
+
+    # mean data for crossval
+    try:
+        
+        mean_tpr[0]  = 0.0
+        mean_tpr /= len(all_plot_data)
+        mean_tpr[-1] = 1.0
+        mean_auc = auc(mean_fpr, mean_tpr)
+        plot_data = {'data_label':'mean',
+                     'roc_auc':mean_auc,
+                     'fpr':mean_fpr,
+                     'tpr':mean_tpr}
+    except TypeError:
+        pass
+    all_plot_data.append(plot_data)
+
+    if args.output_prefix:
+        plot_name = args.output_prefix
+
+    write_roc_curves(all_plot_data, plot_name)
 
     return 0
+
+def proto_to_dict(proto):
+
+    '''Basic prototxt parser for files or strings.
+    Builds a dict of keys with arrays of values.'''
+
+    def parse_to_dict(iter_):
+        d = dict()
+        for line in iter_:
+            if not line:
+                continue
+            elif line[0] == '}':
+                return d
+            elif line[0][-1] == ':':
+                key = line[0][:-1]
+                value = line[1]
+            elif line[1] == '{':
+                key = line[0]
+                value = parse_to_dict(buf_iter)
+            else:
+                continue
+            if key in d:
+                d[key].append(value)
+            else:
+                d[key] = [value]
+        return d
+
+    ws = ' \t\n'
+    toks = [line.lstrip(ws).rstrip(ws).split(' ') for line in proto]
+
+    return parse_to_dict(iter(toks))
+
+def write_score_file(dir_, nnet, data, result):
+
+    model = os.path.basename(nnet.train_model_file).replace('_full.model.prototxt', '')
+    train = os.path.basename(nnet.train_data_file).replace('.full', '')
+    test = os.path.basename(data).replace('.full', '')
+    base_file = os.path.join(dir_, model+'_'+train+'_'+test)
+    with open(base_file + '.scores', 'w') as f:
+        for i in range(result['num']):
+            f.write(str(result['id'][i]))
+            for j in result['score'][i]:
+                f.write(' '+str(j))
+            f.write('\n')
+    return base_file
+
+def write_roc_curves(roc_data, plot_name):
+
+    '''plot_data should be a list of dictionaries. Each dict should have:
+            data_label - the string for the legend
+            auc - value as returned by auc function
+            fpr - array as returned by roc_curve function
+            tpr - array as returned by roc_curve function'''
+
+    plt.figure(1)
+    plt.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6), label='random guess')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver operating characteristic')
+
+    plt.figure(2)
+    plt.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6), label='random guess')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver operating characteristic')
+
+    # sort the plots by area under curve
+    roc_data.sort(key=lambda d: d["roc_auc"], reverse=True)
+
+    # iterate through plot data and add to graphs, full data gets its own graph
+    for i in roc_data:
+        if 'full' in i['data_label']:
+            plt.figure(1)
+            plt.plot(i['fpr'], i['tpr'], lw=1, label='%s (area = %0.2f)' % (i['data_label'], i['roc_auc']))
+        elif 'mean' in i['data_label']:
+            plt.figure(2)
+            plt.plot(i['fpr'], i['tpr'], lw=1, label='%s (area = %0.2f)' % (i['data_label'], i['roc_auc']))
+        else:
+            plt.figure(2)
+            plt.plot(i['fpr'], i['tpr'], 'k--', lw=2, label='%s (area = %0.2f)' % (i['data_label'], i['roc_auc']))
+
+    # finally, add the legend and save the plots as .png files
+    plt.figure(1)
+    lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.savefig(plot_name + 'full-roc.png', bbox_extra_artists=(lgd,), bbox_inches='tight')
+
+    # figure 2, which is for the partitioned/split data, will have a mean line
+    plt.figure(2)
+    lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.savefig(plot_name + 'split-roc.png', bbox_extra_artists=(lgd,), bbox_inches='tight')
 
 def parse_args(argv):
 
@@ -155,7 +321,9 @@ def parse_args(argv):
         description='Generate ROC curves for a trained model.',
         epilog=None)
     parser.add_argument('SOLVER_PATTERN')
-    parser.add_argument('--data_pattern', "-d", type=str)
+    parser.add_argument('--data_pattern', '-d', type=str)
+    parser.add_argument('--output_prefix', '-o', type=str)
+    parser.add_argument('--roc', '-r', type=int)
     return parser.parse_args(argv)
 
 if __name__ == "__main__":
@@ -178,7 +346,7 @@ def old_main():
 
     caffe.set_mode_gpu()
     mean_tpr = 0.0
-    mean_fpr = numpy.linspace(0, 1, 100)
+    mean_fpr = np.linspace(0, 1, 100)
     all_plot_data = []
 
     for solver_file in sorted(solver_glob):
@@ -238,7 +406,7 @@ def old_main():
                 datum = caffe.proto.caffe_pb2.Datum()
                 datum.ParseFromString(value)
                 arr = caffe.io.datum_to_array(datum)
-                out = net.forward_all(data_blob=numpy.asarray([arr]))
+                out = net.forward_all(data_blob=np.asarray([arr]))
 
                 truth.append(datum.label)
                 pred = out["output_act_blob"][0]
@@ -264,7 +432,7 @@ def old_main():
             if "full" in i:
                 is_full_data = True
             else:
-                mean_tpr += numpy.interp(mean_fpr, fpr, tpr)
+                mean_tpr += np.interp(mean_fpr, fpr, tpr)
 
             curr_plot_data = {"data_label":data_label, "roc_auc":roc_auc, "fpr":fpr, "tpr":tpr, "is_full_data":is_full_data}
             all_plot_data.append(curr_plot_data)
@@ -272,41 +440,4 @@ def old_main():
     # we now have the plot data, let's plot them
 
     # plot the random guess line and label the axes
-    plt.figure(1)
-    plt.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6), label='random guess')
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver operating characteristic')
 
-    plt.figure(2)
-    plt.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6), label='random guess')
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver operating characteristic')
-
-    # sort the plots by area under curve
-    all_plot_data.sort(key=lambda curr_plot_data: curr_plot_data["roc_auc"], reverse=True)
-
-    # iterate through plot data and add to graphs, full data gets its own graph
-    for pd in all_plot_data:
-        if pd["is_full_data"]:
-            plt.figure(1)
-            plt.plot(pd["fpr"], pd["tpr"], lw=1, label='%s (area = %0.2f)' % (pd["data_label"], pd["roc_auc"]))
-        else:
-            plt.figure(2)
-            plt.plot(pd["fpr"], pd["tpr"], lw=1, label='%s (area = %0.2f)' % (pd["data_label"], pd["roc_auc"]))
-
-    # finally, add format/add the legend and save the graphs as .png
-    plt.figure(1)
-    lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    plt.savefig(deploy_file.replace("deploy.model.prototxt", "full-roc.png"), bbox_extra_artists=(lgd,), bbox_inches='tight')
-
-    # figure 2, which is for the partitioned/split data, will have a mean line
-    plt.figure(2)
-    mean_tpr[0]  = 0.0
-    mean_tpr /= len(all_plot_data)-1
-    mean_tpr[-1] = 1.0
-    mean_auc = auc(mean_fpr, mean_tpr)
-    plt.plot(mean_fpr, mean_tpr, 'k--', label='mean (area = %0.2f)' % mean_auc, lw=2) # add the mean curve last so it's on top
-    lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    plt.savefig(deploy_file.replace("deploy.model.prototxt", "split-roc.png"), bbox_extra_artists=(lgd,), bbox_inches='tight')

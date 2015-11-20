@@ -16,6 +16,14 @@ CSV_FORMATS = {
         "data":list(range(4, 65)),  # list of columns specifying input features
         "label":0                   # column specifying the class label
     },
+
+    "D3R_SCOREDATA": {
+        "delimiter":' ',
+        "id":2,
+        "group":1, 
+        "data":list(range(4, 65)),
+        "label":None
+    }
 }
 
 # global variables for data partitioning mode
@@ -233,12 +241,15 @@ class Database:
 
     def write_weight_matrix(self):
 
+        if self._format['label'] is None:
+            return
+
         # count number of samples in each class label
         pos, neg = 0, 0
         for i in self._samples:
             if i['y'] == 0:
                 neg += 1
-            else:
+            elif i['y'] == 1:
                 pos += 1
 
         # calculate the imbalance, and weight the cost of

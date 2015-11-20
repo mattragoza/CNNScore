@@ -51,6 +51,7 @@ def write_prototxt(data_prefix, model_temp, solver_temp, output_dir, id_):
 	model  = model_temp.contents.replace("MODEL_NAME", model_name)
 	solver = solver_temp.contents.replace("MODEL_NAME", model_name)
 	solver = solver.replace("OUTPUT_PREFIX", output_prefix)
+	weight_matrix = data_prefix + '_weightmatrix.binaryproto'
 
 	# if we're writing the deploy prototxt, keep the <deploy></deploy> section and remove the <train></train> section
 	if id_ == "deploy":
@@ -60,7 +61,8 @@ def write_prototxt(data_prefix, model_temp, solver_temp, output_dir, id_):
 	# otherwise, get rid of the <deploy></deploy> section and keep the <train></train> section
 	elif id_ == "full":
 		full_lmdb = data_prefix+".full"
-		model = model.replace("TRAIN_LMDB", full_lmdb) # no TEST_LMDB 
+		model = model.replace("TRAIN_LMDB", full_lmdb) # no TEST_LMDB
+		model = model.replace("WEIGHT_MATRIX", weight_matrix) 
 
 		model = model.replace("<train>", "").replace("</train>", "")
 		model = re.sub(r'<deploy>.*?</deploy>', "", model, flags=re.DOTALL)
@@ -75,6 +77,7 @@ def write_prototxt(data_prefix, model_temp, solver_temp, output_dir, id_):
 		test_lmdb  = data_prefix+"."+id_+".test"
 		model = model.replace("TRAIN_LMDB", train_lmdb)
 		model = model.replace("TEST_LMDB",  test_lmdb)
+		model = model.replace("WEIGHT_MATRIX", weight_matrix) 
 
 		model = model.replace("<train>", "").replace("</train>", "")
 		model = re.sub(r'<deploy>.*?</deploy>', "", model, flags=re.DOTALL)
@@ -133,7 +136,7 @@ if __name__ == "__main__":
 	for i in model_temp_glob:
 		model_temp = PrototxtTemplate(i)
 		print("Generating prototxt for " + i)
-		write_prototxt(None, model_temp, solver_temp, args.OUTPUT_DIRECTORY, "deploy") # deploy is for using the trained weights
+		write_prototxt('', model_temp, solver_temp, args.OUTPUT_DIRECTORY, "deploy") # deploy is for using the trained weights
 		write_prototxt(args.DATA_PREFIX, model_temp, solver_temp, args.OUTPUT_DIRECTORY, "full") 
 		for j in range(10):
 			write_prototxt(args.DATA_PREFIX, model_temp, solver_temp, args.OUTPUT_DIRECTORY, "part"+str(j))

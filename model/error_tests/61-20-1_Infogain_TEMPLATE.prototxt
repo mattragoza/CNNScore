@@ -102,8 +102,8 @@ layer {
   bottom: "softmax_blob"
   bottom: "label_blob"
   top: "error_blob"
-  infogain_param {
-    source: "data/SCOREDATA.vina.reduced_weightmatrix.binaryproto"
+  infogain_loss_param {
+    source: "WEIGHT_MATRIX"
   }
 }
 </train>
