@@ -102,6 +102,7 @@ class Database:
         
         csv_file.close()
         
+        self.ncols = data_cols
         self.nsamples = len(self.samples)
         # get a rough estimate of the number of bytes of data assuming 64bit floats
         # this should ONLY be used for determining map size in lmdb, nothing else
@@ -208,7 +209,7 @@ class Database:
         shifts and scales all of its features.'''
 
         n = self.nsamples
-        d = reduce(mul, self._format['shape'])
+        d = self.ncols
 
         # compute mean for each feature
         mean = [0 for i in range(d)]
@@ -240,6 +241,18 @@ class Database:
         random.shuffle(self.samples)
         for i in self.targets:
             random.shuffle(self.targets[i])
+
+    def reshape(self, new_shape):
+
+        new_data_cols = reduce(mul, new_shape)
+
+        if new_data_cols > self.ncols:
+            raise IndexError('can\'t reshape ' + str(self.ncols) + \
+                ' data features into shape ' + 'x'.join([str(i) for i in new_shape]))
+        elif new_data_cols < self.ncols:
+            print('Warning: ' + str(self.ncols - new_data_cols) + ' feature(s) were truncated')
+
+        self._format['shape'] = new_shape
 
     def write_class_weight_matrix(self):
 
