@@ -54,7 +54,7 @@ class CaffeModel(object):
     def from_solver_prototxt(solver_file):
 
         '''Construct a CaffeModel by parsing a solver prototxt file.
-        Parses the training model from the \'net\' parameter, then
+        Parses the training model from the 'net' parameter, then
         tries to parse the training model prototxt as well to get data
         files specified for training and testing.'''
 
@@ -197,6 +197,7 @@ def main(argv=sys.argv[1:]):
                          'fpr':fpr,
                          'tpr':tpr}
 
+            if 
             all_plot_data.append(plot_data)
 
     if not args.roc:
@@ -204,7 +205,7 @@ def main(argv=sys.argv[1:]):
 
     # mean data for crossval
     try:
-        
+
         mean_tpr[0]  = 0.0
         mean_tpr /= len(all_plot_data)
         mean_tpr[-1] = 1.0
