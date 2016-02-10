@@ -10,32 +10,23 @@ from operator import mul
 
 # specify csv-type file formats here
 CSV_FORMATS = {
-    'DUDE_VINA': {
+    'LABELLED_SCOREDATA': {
         'delimiter': ' ',
-        'label':  0,    # class label column
-        'target': 1,    # target name column
-        'id':     2,    # sample id column
-        'data':   4,    # first column of data
-        'shape': [61],  # data dimensions
+        'label': 0,    # class label column
+        'target': 1,   # target name column
+        'id': 2,       # sample id column
+        'data': 4,     # first column of data
+        'shape': [61], # data dimensions
     },
 
-    'D3R_VINA': {
+    'UNLABELLED_SCOREDATA': {
         'delimiter': ' ',
-        'label':  None,
+        'label': None,
         'target': 1,
-        'id':     2,
-        'data':   4,
+        'id': 2,
+        'data': 4,
         'shape': [61]
     },
-
-    'DUDE_GNINAGRID': {
-        'delimiter': ' ',
-        'label':  0,
-        'target': 1,
-        'id':     2,
-        'data':   4,
-        'shape': [35, 49, 49, 49]
-    }
 }
 
 
@@ -82,13 +73,20 @@ class Database:
         # each row in the csv file is parsed into a dictionary with keys for
         # the sample id, target, data vector (x) and label (y)
         # csv_format is used to parse the row into these values
-        for row in csv_reader:
+        for n, row in enumerate(csv_reader):
+
+            if row[0] == 'mismatched':
+                continue
 
             # throws IndexError if csv_format is incorrect
-            s = dict(id=row[csv_format['id']],
-                     target=row[csv_format['target']],
-                     x=[float(row[i]) for i in data_range],
-                     y=int(row[csv_format['label']]))
+            id_ = str(n) + '_' + row[csv_format['id']] 
+            target = row[csv_format['target']]
+            x = [float(row[i]) for i in data_range]
+            if csv_format['label']:
+                y = int(row[csv_format['label']])
+            else:
+                y = None
+            s = dict(id=id_, target=target, x=x, y=y)
 
             # append sample to master sample list
             self.samples.append(s)
@@ -122,7 +120,7 @@ class Database:
                     datum = caffe.proto.caffe_pb2.Datum()
                     datum.shape.dim.extend(self._format['shape'])
                     datum.float_data.extend(i['x']);
-                    datum.label = i['y']
+                    if i['y']: datum.label = i['y']
 
                     # put it as a key, value mapping in the lmdb
                     key = i['id'].encode('ascii')
@@ -140,7 +138,7 @@ class Database:
 
         # write lmdb for the full database
         full_path = os.path.join(dir_, base_name + '.full')
-        self._write_one_lmdb(full_path, None)
+        self._write_one_lmdb(full_path)
         print(full_path)
 
         # write train and test lmdb for each partition in the database
@@ -328,7 +326,7 @@ def main(argv=sys.argv[1:]):
 
     print('Gathering data from '+args.INPUT_FILE)
     try:
-        db = Database(args.INPUT_FILE, 'DUDE_VINA')
+        db = Database(args.INPUT_FILE, args.INPUT_FORMAT)
     except IOError:
         print('Error: could not access the input file')
         return 1
@@ -362,7 +360,7 @@ def main(argv=sys.argv[1:]):
     try:
         db.write_class_weight_matrix()
     except KeyError:
-        print('Warning: can\'t calculate class weights for unlabelled data')
+        pass
     except IOError:
         print('Error: could not access weight matrix output location')
         return 1
@@ -376,6 +374,7 @@ def parse_args(argv):
         prog=__file__,
         description='Convert a csv-like database into preprocessed lmdb format.')
     parser.add_argument('INPUT_FILE')
+    parser.add_argument('INPUT_FORMAT')
     parser.add_argument('OUTPUT_DIR')
     parser.add_argument('--partition', '-p')
     return parser.parse_args(argv)
