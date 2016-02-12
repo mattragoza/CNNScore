@@ -5,169 +5,112 @@ import os
 import re
 import numpy as np
 import caffe
+from caffe.proto import caffe_pb2
+from google import protobuf as pb
+from operator import add
+from functools import reduce
 from sklearn.metrics import roc_curve, auc
 import matplotlib.pyplot as pyplot
 import matplotlib.cm as colormap
 
-MAX_ITER = 10000
-BATCH_SIZE = 10
-GPUS = 0, 1
+USAGE_ERROR = '''\
+usage: python cnnscore.py TASK ARGUMENTS [OPTIONS]
 
-BINMAP_ROOT_DIRS = {
-    'perigee': '/home/dkoes/DUDe/',
-    'dvorak':  '/scr/DUDe/' }
+Tasks/Arguments:
 
-USAGE_STRING = '''\
-usage: python cnnscore.py [options...] <dir> <param>
+    crossval    Train a model using k-fold cross-validation
+        
+        DATA_FILE       Dataset for training and validation
+        MODEL_FILE      Caffe model definition prototxt
+        SOLVER_FILE     Caffe solver definition prototxt
 
-    <dir>       The directory to output and look for all generated files
-    <param>     A string to use as the base for filenames
-    options:
-        -d      Write train and test datasets
-        -m      Write model definitions
-        -s      Write solver definitions
-        -t      Train models in workspace
-        -r      Test models in workspace
+    test        Test a trained model on a dataset
+
+        DATA_FILE       Dataset to produce scores for
+        MODEL_FILE      Model definition prototxt
+        WEIGHT_FILE     Training iteration of weights to use
+
+Options:
+
+    -o OUTPUT_DIR       Directory to output generated files
+    -g GPUS             Comma-delimited device ids of GPUs to use
+    -b BINMAP_ROOT      Root of binmap directory tree
 '''
-
-def write_model_prototxt(model_file, data_file, train=False):
-
-    model = caffe.NetSpec()
-
-    # 34*49*49*49 = 4000066
-    model.data, model.label = caffe.layers.NDimData(
-        ntop=2, ndim_data_param=dict(
-            source=data_file, 
-            root_folder=BINMAP_ROOT_DIRS['dvorak'],
-            batch_size=BATCH_SIZE,
-            shuffle=train,
-            balanced=train and BATCH_SIZE>1,
-            shape=dict(dim=[34, 49, 49, 49])))
-
-    # 64*24^3 = 884736
-    model.conv1 = caffe.layers.Convolution(model.data,
-        kernel_size=3, pad=1, stride=2, num_output=64,
-        weight_filler=dict(type='xavier'))
-    model.conv1_relu = caffe.layers.ReLU(model.conv1,
-        in_place=True)
-
-    model.conv2 = caffe.layers.Convolution(model.conv1_relu,
-        kernel_size=3, pad=1, stride=1, num_output=64,
-        weight_filler=dict(type='xavier'))
-    model.conv2_relu = caffe.layers.ReLU(model.conv2,
-        in_place=True)
-
-    # 128*12^3 = 221184
-    model.conv3 = caffe.layers.Convolution(model.conv2_relu,
-        kernel_size=3, pad=1, stride=2, num_output=128,
-        weight_filler=dict(type='xavier'))
-    model.conv3_relu = caffe.layers.ReLU(model.conv3,
-        in_place=True)
-
-    model.conv4 = caffe.layers.Convolution(model.conv3_relu,
-        kernel_size=3, pad=1, stride=1, num_output=128,
-        weight_filler=dict(type='xavier'))
-    model.conv4_relu = caffe.layers.ReLU(model.conv4,
-        in_place=True)
-
-    # 256*6^3 = 55296
-    model.conv5 = caffe.layers.Convolution(model.conv4_relu,
-        kernel_size=3, pad=1, stride=2, num_output=256,
-        weight_filler=dict(type='xavier'))
-    model.conv5_relu = caffe.layers.ReLU(model.conv5,
-        in_place=True)
-
-    model.conv6 = caffe.layers.Convolution(model.conv5_relu,
-        kernel_size=3, pad=1, stride=1, num_output=256,
-        weight_filler=dict(type='xavier'))
-    model.conv6_relu = caffe.layers.ReLU(model.conv6,
-        in_place=True)
-
-    # 512*3^3 = 13824
-    model.conv7 = caffe.layers.Convolution(model.conv6_relu,
-        kernel_size=3, pad=1, stride=2, num_output=512,
-        weight_filler=dict(type='xavier'))
-    model.conv7_relu = caffe.layers.ReLU(model.conv7,
-        in_place=True)
-
-    model.fc1 = caffe.layers.InnerProduct(model.conv7_relu,
-        num_output=1024, weight_filler=dict(type='xavier'))
-    model.fc1_drop = caffe.layers.Dropout(model.fc1)
-    model.fc1_relu = caffe.layers.ReLU(model.fc1_drop,
-        in_place=True)
-
-    model.fc2 = caffe.layers.InnerProduct(model.fc1_relu,
-        num_output=1024, weight_filler=dict(type='xavier'))
-    model.fc2_drop = caffe.layers.Dropout(model.fc2)
-    model.fc2_relu = caffe.layers.ReLU(model.fc2_drop,
-        in_place=True)
-
-    model.fc3 = caffe.layers.InnerProduct(model.fc2_relu,
-        num_output=2, weight_filler=dict(type='xavier'))
-    if train:
-        model.loss = caffe.layers.SoftmaxWithLoss(model.fc3, model.label)
-    else:
-        model.score = caffe.layers.Softmax(model.fc3)
-
-    with open(model_file, 'w') as f:
-        f.write(str(model.to_proto()))
+OUTPUT_DIR_ERROR = 'error: could not make or access the output directory'
 
 
-def write_solver_prototxt(solver_file, train_model_file):
-
-    solver = dict(
-        train_net=train_model_file,
-        base_lr=0.01,
-        momentum=0.9,
-        weight_decay=0.0005,
-        lr_policy='inv',
-        gamma=0.0001,
-        power=0.75,
-        display=10,
-        max_iter=MAX_ITER,
-        snapshot=1000,
-        snapshot_prefix=train_model_file.replace('_train.model.prototxt', '') )
-
-    buf = ''
-    for i in solver:
-        if type(solver[i]) is str:
-            buf += i + ': "' + solver[i] + '"\n'
-        else:
-            buf += i + ': ' + str(solver[i]) + '\n'
-    
-    with open(solver_file, 'w') as f:
-        f.write(buf)
+class UsageError(Exception): 
+    pass
 
 
-def read_data_to_dict(data_file):
+def read_data_to_target_dict(data_file):
+    '''Read a .binmaps file into a dictionary where keys are
+    targets and values are the list of corresponding examples,
+    as [example, label].'''
 
     data = dict()
     with open(data_file, 'r') as f:
         for line in f:
             label, target, example = line.rstrip().split()
-            if target in data:
-                data[target].append([example, int(label)])
-            else:
-                data[target] = [[example, int(label)]]
+            try:
+                label = int(label)
+            except ValueError:
+                label = None
+
+            if target not in data:
+                data[target] = []
+            data[target].append([example, label])
 
     return data
 
 
-def read_data_to_lists(data_file):
+def read_data_to_column_dict(data_file):
+    '''Read a .binmaps file into a dictionary where keys are labels,
+    targets, and examples, and values are lists of corresponding data
+    in the order it appears in the file.'''
 
     targets, examples, labels = [], [], []
     with open(data_file, 'r') as f:
         for line in f:
             label, target, example = line.rstrip().split()
+            try:
+                label = int(label)
+            except ValueError:
+                label = None
 
+            labels.append(label)
             targets.append(target)
             examples.append(example)
-            labels.append(int(label))
 
-    return targets, examples, labels
+    return dict(labels=labels, targets=targets, examples=examples)
 
 
-def reduce_data(data, factor):
+def read_scored_data_to_column_dict(data_file):
+    '''Read a .scores file into a dictionary where keys are labels,
+    targets, examples, and scores, and values are lists of corresponding
+    data in the order it appears in the file.'''
+
+    targets, examples, labels, scores = [], [], [], []
+    with open(data_file, 'r') as f:
+        for line in f:
+            label, target, example, score = line.rstrip().split()
+            try:
+                label = int(label)
+            except ValueError:
+                label = None
+
+            labels.append(label)
+            targets.append(target)
+            examples.append(example)
+            scores.append(score)
+
+    return dict(labels=labels, targets=targets, examples=examples, scores=scores)
+
+
+def reduce_target_data(data, factor):
+    '''Creates a reduced data set by randomly sampling from the given
+    target dictioanry such that each target's number of examples has
+    been reduced by the given factor.'''
 
     reduced = dict()
     for target in data:
@@ -177,7 +120,10 @@ def reduce_data(data, factor):
     return reduced
 
 
-def k_fold_partitions(data, k): 
+def k_fold_partitions(data, k):
+    '''Returns a list of k balanced partitions of the data targets,
+    where each partition is a list of the targets that should be
+    withheld and used as the test set.'''
 
     targets = list(data.keys())
     targets.sort(key=lambda target: len(data[target]), reverse=True)
@@ -189,7 +135,7 @@ def k_fold_partitions(data, k):
         parts[i].append(target)
         if forward:
             i += 1
-            if i == k - 1:
+            if i + 1 == k:
                 forward = False
         else:
             i -= 1
@@ -204,185 +150,314 @@ def write_data_to_binmaps_file(data_file, data, targets=None):
     if targets is None:
         targets = data.keys()
 
+    lines = []
+    for target in targets:
+        for example in data[target]:
+            lines.append(str(example[1]) + ' ' + target + ' ' + example[0])
+
+    np.random.shuffle(lines)
+
     with open(data_file, 'w') as f:
-
-        lines = []
-        for target in targets:
-            for example in data[target]:
-                lines.append(str(example[1]) + ' ' + target + ' ' + example[0])
-
-        np.random.shuffle(lines)
         f.write('\n'.join(lines) + '\n')
 
 
-def generate_crossval_filenames(output_dir, full_data_file, param_str, k):
+def plot_roc_curves(roc_plot_file, plot_data, mode):
 
-    if full_data_file[-8:] != '.binmaps':
-        raise TypeError('full_data_file argument must be a .binmaps file')
-    if not k > 1:
-        raise IndexError('k argument must be greater than 1')
+    pyplot.clf()
+    pyplot.title('Receiver Operating Characteristic')
+    pyplot.xlabel('False Positive Rate')
+    pyplot.ylabel('True Positive Rate')
+    pyplot.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6), label='random guess')
+    
+    colors = colormap.rainbow(np.linspace(0, 1, len(plot_data)))
+    for i, series in enumerate(plot_data):
 
-    crossval_files = dict(
-        train_data=[],
-        test_data=[],
-        train_models=[],
-        test_models=[],
-        solvers=[],
-        weights=[[] for i in range(k)],
-        roc_plot=[] )
+        fpr, tpr, thresholds = roc_curve(series['labels'], series['scores']) 
+        pyplot.plot(fpr, tpr, '-', color=colors[i], \
+            label=series.get('name', 'series %d' % i) + ' (AUC=%0.2f)' % auc(fpr, tpr))
 
-    for i in range(k):
+    legend = pyplot.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    pyplot.savefig(roc_plot_file, bbox_extra_artists=(legend,), bbox_inches='tight')
 
-        train_data_file = os.path.join(output_dir, os.path.basename(full_data_file)[:-8] + '_part' + str(i) + '_train.binmaps')
-        test_data_file  = os.path.join(output_dir, os.path.basename(full_data_file)[:-8] + '_part' + str(i) + '_test.binmaps')
-        train_model_file = os.path.join(output_dir, param_str + '_part' + str(i) + '_train.model.prototxt')
-        test_model_file  = os.path.join(output_dir, param_str + '_part' + str(i) + '_test.model.prototxt')
-        solver_file = os.path.join(output_dir, param_str + '_part' + str(i) + '.solver.prototxt')
 
-        crossval_files['train_data'].append(train_data_file)
-        crossval_files['test_data'].append(test_data_file)
-        crossval_files['train_models'].append(train_model_file)
-        crossval_files['test_models'].append(test_model_file)
-        crossval_files['solvers'].append(solver_file)
+def write_scores_to_file(score_file, results):
 
-        for j in range(1000, 10001, 1000): # TODO should these iter values really be hard-coded?
-            weight_file = os.path.join(output_dir, param_str + '_part' + str(i) + '_iter_' + str(j) + '.caffemodel')
-            crossval_files['weights'][i].append(weight_file)
+    buf = ''
+    for i, example in enumerate(results['examples']):
+        target = results['targets'][i]
+        label = results['labels'][i]
+        score = results['scores'][i]
+        buf += ' '.join(map(str, [label, target, example, score])) + '\n'
 
-        roc_plot_file = os.path.join(output_dir, param_str + '_part' + str(i) + '.roc.png')
-        crossval_files['roc_plot'].append(roc_plot_file)
-
-    return crossval_files
+    with open(score_file, 'w') as f:
+        f.write(buf)
 
 
 def score_data_with_model(model_file, weight_file, data_file):
 
     targets, examples, labels = read_data_to_lists(data_file)
     model = caffe.Net(model_file, weight_file, caffe.TEST)
+    batch_size = model.blobs['data'].shape[0] # assumes existence of 'data' blob
+    num_batches = len(examples)//batch_size + 1
     scores = []
 
     c = 0
-    for i in range(len(examples)//BATCH_SIZE + 1):
+    for i in range(num_batches):
 
         # this assumes that model scores examples in same
         # order in which they appear in the data file
+        print('Scoring %s: batch %d / %d' % (data_file, i, num_batches))
 
         output = model.forward()
-        for j in range(BATCH_SIZE):
+        for j in range(batch_size):
         
-            if i*BATCH_SIZE + j >= len(examples):
+            if i*batch_size + j >= len(examples):
                 break
 
-            print('Scoring example %s' % examples[i*BATCH_SIZE+j])
-            scores.append(output['score'][j][1])
+            scores.append(output['pred'][j][1])
 
     return dict(targets=targets, examples=examples, labels=labels, scores=scores)
 
 
-def plot_roc_curves(roc_plot_file, results):
+def write_model_prototxt(model_file, model_prototype, data_file, binmap_root, mode):
+    
+    model = caffe_pb2.NetParameter()
+    model.CopyFrom(model_prototype)
 
-    pyplot.title('Receiver Operating Characteristic')
-    pyplot.xlabel('False Positive Rate')
-    pyplot.ylabel('True Positive Rate')
-    pyplot.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6), label='random guess')
-    colors = colormap.rainbow(np.linspace(0, 1, len(results)))
-    legend = pyplot.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    data_layer = model.layer[0]
+    data_layer.ndim_data_param.source = data_file
+    data_layer.ndim_data_param.root_folder = binmap_root
 
-    for i, data in enumerate(results):
+    if mode == 'train':
+        data_layer.ndim_data_param.shuffle = True
+        data_layer.ndim_data_param.balanced = True
+        for i, layer in enumerate(model.layer):
+            if layer.name == 'pred':
+                model.layer.pop(i)
 
-        fpr, tpr, thresholds = roc_curve(data['labels'], data['scores']) 
-        pyplot.plot(fpr, tpr, '-', color=colors[i], label='iter%d (area = %0.2f)' % (1000*i+1000, auc(fpr, tpr)))
+    elif mode == 'test':
+        data_layer.ndim_data_param.shuffle = False
+        data_layer.ndim_data_param.balanced = False
+        for i, layer in enumerate(model.layer):
+            if layer.name == 'loss':
+                model.layer.pop(i)
 
-    pyplot.savefig(roc_plot_file, bbox_extra_artists=(legend,), bbox_inches='tight')
+    with open(model_file, 'w') as f:
+        f.write(str(model))
+
+
+def write_solver_prototxt(solver_file, solver_prototype, model_file):
+
+    solver = caffe_pb2.SolverParameter()
+    solver.CopyFrom(solver_prototype)
+
+    solver.train_net = model_file
+    weight_prefix = model_file.replace('_train.model.prototxt', '')
+    solver.snapshot_prefix = weight_prefix
+
+    with open(solver_file, 'w') as f:
+        f.write(str(solver))
+
+
+def read_model_prototxt(model_file):
+
+    model = caffe_pb2.NetParameter()
+    with open(model_file, 'r') as f:
+        pb.text_format.Merge(str(f.read()), model)
+    return model
+
+
+def read_solver_prototxt(solver_file):
+
+    solver = caffe_pb2.SolverParameter()
+    with open(solver_file, 'r') as f:
+        pb.text_format.Merge(str(f.read()), solver)
+    return solver
+
+
+def generate_crossval_files(output_dir, full_data_file, binmap_root, model_prototype_file, solver_prototype_file, k=0):
+
+    # keep track of names of all generated files in a dictionary
+    crossval_files = dict(train_data=[], test_data=[], train_models=[], test_models=[], \
+        solvers=[], weights=[], roc_plots=[])
+
+    # get parameter strings for data, model, and solver arguments
+    data_param, data_ext = os.path.splitext(os.path.basename(full_data_file)) # data_param.data_ext
+    model_param  = os.path.basename(model_prototype_file).split('.')[0] # model_param.model.prototxt
+    solver_param = os.path.basename(solver_prototype_file).split('.')[0] # solver_param.solver.prototxt
+
+    # split data targets into k-fold partitions
+    full_data = read_data_to_dict(full_data_file)
+    if k: parts = k_fold_partitions(full_data, k)
+
+    for i in range(k+1):
+
+        if i == 0:
+            # train and/or test on full data
+            part_param = 'full'
+            train_data_file = full_data_file
+            test_data_file  = full_data_file
+        else:
+            # split full data into train and test data using target partitions
+            part_param = 'part' + str(i)
+            train_data_file = os.path.join(output_dir, '_'.join([data_param, part_param, 'train']) + data_ext)
+            test_data_file  = os.path.join(output_dir, '_'.join([data_param, part_param, 'test'])  + data_ext)
+            train_targets = [t for p, part in enumerate(parts) if p != (i-1) for t in part]
+            test_targets = parts[i-1]
+            write_data_to_binmaps_file(train_data_file, full_data, train_targets)
+            write_data_to_binmaps_file(test_data_file,  full_data, test_targets)
+
+        crossval_files['train_data'].append(train_data_file)
+        crossval_files['test_data'].append(test_data_file)
+
+
+        # create prototxt for train model, test model and solver for each
+        model_prototype  = read_model_prototxt(model_prototype_file)
+        solver_prototype = read_solver_prototxt(solver_prototype_file)
+        train_model_file = os.path.join(output_dir, '_'.join([model_param, part_param, 'train']) + '.model.prototxt')
+        test_model_file  = os.path.join(output_dir, '_'.join([model_param, part_param, 'test'])  + '.model.prototxt')
+        solver_file = os.path.join(output_dir, '_'.join([solver_param, part_param]) + '.solver.prototxt')
+        write_model_prototxt(train_model_file, model_prototype, train_data_file, binmap_root, mode='train')
+        write_model_prototxt(test_model_file,  model_prototype, test_data_file,  binmap_root, mode='test')
+        write_solver_prototxt(solver_file, solver_prototype, train_model_file)
+        crossval_files['train_models'].append(train_model_file)
+        crossval_files['test_models'].append(test_model_file)
+        crossval_files['solvers'].append(solver_file)
+
+
+        # keep track of weight files and score files that will be produced
+        weight_files = list()
+        snap = solver_prototype.snapshot
+        if snap > 0:
+            weight_iters = range(snap, solver_prototype.max_iter+snap, snap)
+        else:
+            weight_iters = [solver_prototype.max_iter]
+        for j in weight_iters:
+            iter_param = 'iter_' + str(j)
+            weight_file = os.path.join(output_dir, '_'.join([model_param, part_param, iter_param]) + '.caffemodel')
+            weight_files.append(weight_file)
+
+        crossval_files['weights'].append(weight_files)
+
+    # make a results roc curve
+    roc_plot_file = os.path.join(output_dir, '_'.join([model_param]) + '.roc.png')
+    crossval_files['roc_plots'].append(roc_plot_file)
+
+    return crossval_files
+
+
+def generate_test_files(output_dir, test_data_file, binmap_root, model_prototype_file, weight_file):
+
+    test_files = dict(test_data=None, test_model=None, score=None)
+
+    # get parameter strings for data, model, and solver arguments
+    data_param, data_ext = os.path.splitext(os.path.basename(test_data_file)) # data_param.data_ext
+    model_param = os.path.basename(model_prototype_file).split('.')[0] # model_param.model.prototxt
+
+    model_prototype = read_model_prototxt(model_prototype_file)
+    test_model_file = os.path.join(output_dir, '_'.join([model_param, data_param])  + '.model.prototxt')
+    write_model_prototxt(test_model_file, model_prototype, test_data_file, binmap_root, mode='test')
+
+    weight_param = os.path.splitext(os.path.basename(weight_file))[0]
+    score_file = os.path.join(output_dir, '_'.join([weight_param, data_param]) + '.scores')
+
+    test_files['test_data'] = test_data_file
+    test_files['test_model'] = test_model_file
+    test_files['score'] = score_file
+
+    return test_files
+
+
+def crossval_model(output_dir, data_file, model_file, solver_file, opts):
+    
+    gpus = opts.pop('-g', '0')
+
+    crossval_files = generate_crossval_files(output_dir, data_file, model_file, solver_file, k=3)
+    
+    for i in range(k+1):
+
+        solver_file = crossval_files['solvers'][i]
+        os.system('caffe train -solver ' + solver_file + ' -gpu ' + gpus)
+
+    caffe.set_device(int(gpus[0]))
+    caffe.set_mode_gpu()
+    plot_data = []
+    for i in range(k+1):
+
+        test_data_file = crossval_files['test_data'][i]
+        test_model_file = crossval_files['test_models'][i]
+        weight_file = crossval_files['weights'][i][-1]
+        results = score_data_with_model(test_model_file, weight_file, test_data_file)
+
+        results['name'] = os.path.basename(weight_file)
+        plot_data.append(results)
+
+    roc_plot_file = crossval_files['roc_plots'][0]
+    plot_roc_curves(roc_plot_file, plot_data)
+
+
+def test_model(output_dir, data_file, model_file, weight_file, opts):
+
+    gpus = opts.pop('-g', '0')
+    binmap_root = opts.pop('-b', '/scr/DUDe/')
+    
+    test_files = generate_test_files(output_dir, data_file, binmap_root, model_file, weight_file)
+    caffe.set_device(int(gpus[0]))
+    caffe.set_mode_gpu()
+
+    test_data_file = test_files['test_data']
+    test_model_file = test_files['test_model']
+    weight_file = weight_file
+    results = score_data_with_model(test_model_file, weight_file, test_data_file)
+
+    score_file = test_files['score']
+    write_scores_to_file(score_file, results)
 
 
 def parse_args(argv):
 
-    args, flags = list(), set()
-    for arg in argv:
+    # first get optional args
+    opts = dict()
+    for i, arg in enumerate(argv):
         if arg[0] == '-':
-            for c in arg[1:]:
-                flags.add(c)
-        else:
-            args.append(arg)
+            if arg in ['-o', '-g', '-b']:
+                opt = argv.pop(i)
+                val = argv[i]
+                opts[opt] = val
+            else:
+                raise UsageError()
 
-    return args[1], args[2], flags
+    # then get positional args
+    if len(argv) < 5:
+        raise UsageError() 
+    task = argv[1]
+    args = argv[2:]
+    if task not in ['crossval', 'test']:
+        raise UsageError()
+
+    return task, args, opts 
 
 
 def main(argv=sys.argv):
 
     try:
-        output_dir, param_str, flags = parse_args(argv)
+        task, args, opts = parse_args(argv)
+    except UsageError:
+        return USAGE_ERROR
+
+    try:
+        output_dir = opts.pop('-o', '.')
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-    except IndexError:
-        return USAGE_STRING
+    except IOError:
+        return OUTPUT_DIR_ERROR
 
-    data_file = '/net/pulsar/home/koes/mtr22/CNNScore/all.binmaps'
-    k = 3
+    if task == 'crossval':
+        crossval_model(output_dir, args[0], args[1], args[2], opts)
 
-    # generate filenames for everything we need for cross-validation
-    crossval_files = generate_crossval_filenames(output_dir, data_file, param_str, k)
+    elif task == 'test':
+        test_model(output_dir, args[0], args[1], args[2], opts)
 
-    # write k-fold data
-    if 'd' in flags:
-        full_data = read_data_to_dict(data_file)
-        parts = k_fold_partitions(full_data, k)
-        for i in range(k):
-
-            train_data_file = crossval_files['train_data'][i]
-            train_targets = [t for p, part in enumerate(parts) if p != i for t in part]
-            write_data_to_binmaps_file(train_data_file, full_data, train_targets)
-            
-            test_data_file  = crossval_files['test_data'][i]
-            test_targets = parts[i]
-            write_data_to_binmaps_file(test_data_file, full_data, test_targets)
-
-    # write model definitions
-    if 'm' in flags:
-        for i in range(k):
-            
-            train_data_file  = crossval_files['train_data'][i]
-            train_model_file = crossval_files['train_models'][i]
-            write_model_prototxt(train_model_file, train_data_file, train=True)
-
-            test_data_file  = crossval_files['test_data'][i]
-            test_model_file = crossval_files['test_models'][i]
-            write_model_prototxt(test_model_file, test_data_file)
-
-    # write solver definitions
-    if 's' in flags:
-        for i in range(k):
-            
-            solver_file = crossval_files['solvers'][i]
-            train_model_file = crossval_files['train_models'][i]
-            write_solver_prototxt(solver_file, train_model_file)
-
-    # train models with training data and solvers
-    if 't' in flags:
-        for i in range(k):
-
-            solver_file = crossval_files['solvers'][i]
-            command = 'caffe train -solver ' + solver_file + ' -gpu ' + ','.join(map(str, GPUS))
-            os.system(command)
-
-    # score test data using trained models
-    caffe.set_device(GPUS[0])
-    caffe.set_mode_gpu()
-    if 'r' in flags:
-        results = [[] for i in range(k)]
-        for i in range(k):
-
-            test_data_file  = crossval_files['test_data'][i]
-            test_model_file = crossval_files['test_models'][i]
-
-            for weight_file in crossval_files['weights'][i]:
-                results[i].append(score_data_with_model(test_model_file, weight_file, test_data_file))
-        
-            # view the results
-            roc_plot_file = crossval_files['roc_plot'][i]
-            plot_roc_curves(roc_plot_file, results[i])
-        
 
 if __name__ == '__main__':
     sys.exit(main())
