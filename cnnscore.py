@@ -170,21 +170,21 @@ def write_data_to_binmaps_file(data_file, data, targets=None):
 
 def plot_roc_curves(roc_plot_file, plot_data):
 
-    pyplot.clf()
-    pyplot.title('Receiver Operating Characteristic')
-    pyplot.xlabel('False Positive Rate')
-    pyplot.ylabel('True Positive Rate')
-    pyplot.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6), label='random guess')
+    plt.clf()
+    plt.title('Receiver Operating Characteristic')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6), label='random guess')
     
     colors = colormap.rainbow(np.linspace(0, 1, len(plot_data)))
     for i, series in enumerate(plot_data):
 
         fpr, tpr, thresholds = roc_curve(series['labels'], series['scores']) 
-        pyplot.plot(fpr, tpr, '-', color=colors[i], \
+        plt.plot(fpr, tpr, '-', color=colors[i], \
             label=series.get('name', 'series %d' % i) + ' (AUC=%0.2f)' % auc(fpr, tpr))
 
-    legend = pyplot.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    pyplot.savefig(roc_plot_file, bbox_extra_artists=(legend,), bbox_inches='tight')
+    legend = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.savefig(roc_plot_file, bbox_extra_artists=(legend,), bbox_inches='tight')
 
 
 def write_scores_to_file(score_file, results):
@@ -468,10 +468,10 @@ def main(argv=sys.argv):
         return OUTPUT_DIR_ERROR
 
     if args[0] == 'crossval':
-        crossval_model(output_dir, args[0], args[1], args[2], opts)
+        crossval_model(output_dir, args[1], args[2], args[3], opts)
 
     elif args[0] == 'test':
-        test_model(output_dir, args[0], args[1], args[2], opts)
+        test_model(output_dir, args[1], args[2], args[3], opts)
 
 
 if __name__ == '__main__':
