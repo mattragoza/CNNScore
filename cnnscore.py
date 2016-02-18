@@ -1,19 +1,4 @@
-import matplotlib
-matplotlib.use('Agg')
-import sys
-import os
-import re
-import numpy as np
-import caffe
-from caffe.proto import caffe_pb2
-from google import protobuf as pb
-from operator import add
-from functools import reduce
-from sklearn.metrics import roc_curve, auc
-import matplotlib.pyplot as pyplot
-import matplotlib.cm as colormap
-
-USAGE_ERROR = '''\
+'''\
 usage: python cnnscore.py TASK ARGUMENTS [OPTIONS]
 
 Tasks/Arguments:
@@ -36,12 +21,44 @@ Options:
     -g GPUS             Comma-delimited device ids of GPUs to use
     -b BINMAP_ROOT      Root of binmap directory tree
 '''
+
+import matplotlib
+matplotlib.use('Agg')
+import sys
+import os
+import numpy as np
+import caffe
+from caffe.proto import caffe_pb2
+from google import protobuf as pb
+from sklearn.metrics import roc_curve, auc
+import matplotlib.pyplot as plt
+import matplotlib.cm as colormap
+from itertools import groupby
+
+
 OUTPUT_DIR_ERROR = 'error: could not make or access the output directory'
+GPU_BUSY_ERROR = 'error: one or more selected GPUs are unavailable'
+
+DEFAULT_BINMAP_ROOT = '/scr/DUDe/'
 
 
-class UsageError(Exception): 
-    pass
+class UsageError(Exception):
+    def __init__(self, msg):
+        self.msg = msg
 
+
+# functional stuff
+
+def read_lines_from_file(file):
+    '''Read file to a list of lines split by whitespace'''
+    with open(file, 'r') as f:
+        return list(map(str.split, f.read().splitlines()))
+
+def transpose(list_list):
+    '''Transpose inner and outer lists'''
+    return list(map(list, zip(*list_list)))
+
+# working stuff
 
 def read_data_to_target_dict(data_file):
     '''Read a .binmaps file into a dictionary where keys are
@@ -102,7 +119,7 @@ def read_scored_data_to_column_dict(data_file):
             labels.append(label)
             targets.append(target)
             examples.append(example)
-            scores.append(score)
+            scores.append(float(score))
 
     return dict(labels=labels, targets=targets, examples=examples, scores=scores)
 
@@ -123,24 +140,14 @@ def reduce_target_data(data, factor):
 def k_fold_partitions(data, k):
     '''Returns a list of k balanced partitions of the data targets,
     where each partition is a list of the targets that should be
-    withheld and used as the test set.'''
+    withheld from training and used as the test set.'''
 
     targets = list(data.keys())
-    targets.sort(key=lambda target: len(data[target]), reverse=True)
+    np.random.shuffle(targets)
 
     parts = [[] for i in range(k)]
-    i = 0
-    forward = True
-    for target in targets:
-        parts[i].append(target)
-        if forward:
-            i += 1
-            if i + 1 == k:
-                forward = False
-        else:
-            i -= 1
-            if i == 0:
-                forward = True
+    for i, target in enumerate(targets):
+        parts[i%k].append(target)
 
     return parts
 
@@ -161,7 +168,7 @@ def write_data_to_binmaps_file(data_file, data, targets=None):
         f.write('\n'.join(lines) + '\n')
 
 
-def plot_roc_curves(roc_plot_file, plot_data, mode):
+def plot_roc_curves(roc_plot_file, plot_data):
 
     pyplot.clf()
     pyplot.title('Receiver Operating Characteristic')
@@ -193,13 +200,14 @@ def write_scores_to_file(score_file, results):
         f.write(buf)
 
 
-def score_data_with_model(model_file, weight_file, data_file):
+def get_model_predictions(model_file, weight_file, data_file):
 
-    targets, examples, labels = read_data_to_lists(data_file)
+    data = read_data_to_column_dict(data_file)
     model = caffe.Net(model_file, weight_file, caffe.TEST)
     batch_size = model.blobs['data'].shape[0] # assumes existence of 'data' blob
-    num_batches = len(examples)//batch_size + 1
-    scores = []
+    num_examples = len(data['examples'])
+    num_batches = num_examples//batch_size + 1
+    data['scores'] = []
 
     c = 0
     for i in range(num_batches):
@@ -211,12 +219,12 @@ def score_data_with_model(model_file, weight_file, data_file):
         output = model.forward()
         for j in range(batch_size):
         
-            if i*batch_size + j >= len(examples):
+            if i*batch_size + j >= num_examples:
                 break
 
-            scores.append(output['pred'][j][1])
+            data['scores'].append(output['pred'][j][1])
 
-    return dict(targets=targets, examples=examples, labels=labels, scores=scores)
+    return data
 
 
 def write_model_prototxt(model_file, model_prototype, data_file, binmap_root, mode):
@@ -287,13 +295,13 @@ def generate_crossval_files(output_dir, full_data_file, binmap_root, model_proto
     solver_param = os.path.basename(solver_prototype_file).split('.')[0] # solver_param.solver.prototxt
 
     # split data targets into k-fold partitions
-    full_data = read_data_to_dict(full_data_file)
+    full_data = read_data_to_target_dict(full_data_file)
     if k: parts = k_fold_partitions(full_data, k)
 
     for i in range(k+1):
 
         if i == 0:
-            # train and/or test on full data
+            # train and test on full data
             part_param = 'full'
             train_data_file = full_data_file
             test_data_file  = full_data_file
@@ -329,13 +337,14 @@ def generate_crossval_files(output_dir, full_data_file, binmap_root, model_proto
         weight_files = list()
         snap = solver_prototype.snapshot
         if snap > 0:
-            weight_iters = range(snap, solver_prototype.max_iter+snap, snap)
+            weight_iters = range(snap, solver_prototype.max_iter + snap, snap)
         else:
             weight_iters = [solver_prototype.max_iter]
         for j in weight_iters:
             iter_param = 'iter_' + str(j)
             weight_file = os.path.join(output_dir, '_'.join([model_param, part_param, iter_param]) + '.caffemodel')
             weight_files.append(weight_file)
+            # TODO crossval score files
 
         crossval_files['weights'].append(weight_files)
 
@@ -371,15 +380,17 @@ def generate_test_files(output_dir, test_data_file, binmap_root, model_prototype
 def crossval_model(output_dir, data_file, model_file, solver_file, opts):
     
     gpus = opts.pop('-g', '0')
+    binmap_root = opts.pop('-b', DEFAULT_BINMAP_ROOT)
+    k = 3
 
-    crossval_files = generate_crossval_files(output_dir, data_file, model_file, solver_file, k=3)
+    crossval_files = generate_crossval_files(output_dir, data_file, binmap_root, model_file, solver_file, k)
     
     for i in range(k+1):
 
         solver_file = crossval_files['solvers'][i]
         os.system('caffe train -solver ' + solver_file + ' -gpu ' + gpus)
 
-    caffe.set_device(int(gpus[0]))
+    caffe.set_device(int(gpus[0])) # can pycaffe do multi-gpu?
     caffe.set_mode_gpu()
     plot_data = []
     for i in range(k+1):
@@ -387,8 +398,7 @@ def crossval_model(output_dir, data_file, model_file, solver_file, opts):
         test_data_file = crossval_files['test_data'][i]
         test_model_file = crossval_files['test_models'][i]
         weight_file = crossval_files['weights'][i][-1]
-        results = score_data_with_model(test_model_file, weight_file, test_data_file)
-
+        results = get_model_predictions(test_model_file, weight_file, test_data_file)
         results['name'] = os.path.basename(weight_file)
         plot_data.append(results)
 
@@ -399,51 +409,56 @@ def crossval_model(output_dir, data_file, model_file, solver_file, opts):
 def test_model(output_dir, data_file, model_file, weight_file, opts):
 
     gpus = opts.pop('-g', '0')
-    binmap_root = opts.pop('-b', '/scr/DUDe/')
+    binmap_root = opts.pop('-b', DEFAULT_BINMAP_ROOT)
     
     test_files = generate_test_files(output_dir, data_file, binmap_root, model_file, weight_file)
-    caffe.set_device(int(gpus[0]))
+    
+    caffe.set_device(int(gpus[0])) 
     caffe.set_mode_gpu()
 
     test_data_file = test_files['test_data']
     test_model_file = test_files['test_model']
-    weight_file = weight_file
-    results = score_data_with_model(test_model_file, weight_file, test_data_file)
+    results = get_model_predictions(test_model_file, weight_file, test_data_file)
 
     score_file = test_files['score']
     write_scores_to_file(score_file, results)
 
 
 def parse_args(argv):
-
+    args, opts = list(), dict()
     # first get optional args
-    opts = dict()
+    opt = None
     for i, arg in enumerate(argv):
-        if arg[0] == '-':
-            if arg in ['-o', '-g', '-b']:
-                opt = argv.pop(i)
-                val = argv[i]
-                opts[opt] = val
+        if arg[0] == '-': # arg is an opt
+            if opt:
+                raise UsageError('error: option ' + opt + ' expected a value')
+            if arg == '-h':
+                raise UsageError(__doc__)
+            elif arg in ['-o', '-g', '-b']:
+                opt = arg
             else:
-                raise UsageError()
-
-    # then get positional args
-    if len(argv) < 5:
-        raise UsageError() 
-    task = argv[1]
-    args = argv[2:]
-    if task not in ['crossval', 'test']:
-        raise UsageError()
-
-    return task, args, opts 
+                raise UsageError('error: invalid option ' + arg)
+        elif opt: # previous arg was an opt, so this is its value
+            opts[opt] = arg
+            opt = None
+        elif i > 0: # ignore the script name
+            args.append(arg)
+    if opt:
+        raise UsageError('error: option ' + opt + ' expected a value')
+    # then assert positional args
+    if len(args) < 4:
+        raise UsageError('error: not enough arguments') 
+    if args[0] not in ['crossval', 'test']:
+        raise UsageError('error: task should be \'crossval\' or \'test\'')
+    return args, opts
 
 
 def main(argv=sys.argv):
 
     try:
-        task, args, opts = parse_args(argv)
-    except UsageError:
-        return USAGE_ERROR
+        args, opts = parse_args(argv)
+    except UsageError as e:
+        return e.msg
 
     try:
         output_dir = opts.pop('-o', '.')
@@ -452,10 +467,10 @@ def main(argv=sys.argv):
     except IOError:
         return OUTPUT_DIR_ERROR
 
-    if task == 'crossval':
+    if args[0] == 'crossval':
         crossval_model(output_dir, args[0], args[1], args[2], opts)
 
-    elif task == 'test':
+    elif args[0] == 'test':
         test_model(output_dir, args[0], args[1], args[2], opts)
 
 
