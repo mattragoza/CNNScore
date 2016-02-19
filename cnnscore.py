@@ -1,27 +1,3 @@
-'''\
-usage: python cnnscore.py TASK ARGUMENTS [OPTIONS]
-
-Tasks/Arguments:
-
-    crossval    Train a model using k-fold cross-validation
-        
-        DATA_FILE       Dataset for training and validation
-        MODEL_FILE      Caffe model definition prototxt
-        SOLVER_FILE     Caffe solver definition prototxt
-
-    test        Test a trained model on a dataset
-
-        DATA_FILE       Dataset to produce scores for
-        MODEL_FILE      Model definition prototxt
-        WEIGHT_FILE     Training iteration of weights to use
-
-Options:
-
-    -o OUTPUT_DIR       Directory to output generated files
-    -g GPUS             Comma-delimited device ids of GPUs to use
-    -b BINMAP_ROOT      Root of binmap directory tree
-'''
-
 import matplotlib
 matplotlib.use('Agg')
 import sys
