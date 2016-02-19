@@ -26,14 +26,16 @@ import matplotlib
 matplotlib.use('Agg')
 import sys
 import os
+import argparse
 import numpy as np
+
 import caffe
 from caffe.proto import caffe_pb2
 from google import protobuf as pb
 from sklearn.metrics import roc_curve, auc
+
 import matplotlib.pyplot as plt
 import matplotlib.cm as colormap
-from itertools import groupby
 
 
 OUTPUT_DIR_ERROR = 'error: could not make or access the output directory'
@@ -68,14 +70,17 @@ def read_data_to_target_dict(data_file):
     data = dict()
     with open(data_file, 'r') as f:
         for line in f:
-            label, target, example = line.rstrip().split()
+            fields = line.rstrip().split()
             try:
-                label = int(label)
+                label = int(fields[0])
             except ValueError:
                 label = None
 
+            target = fields[1]
             if target not in data:
                 data[target] = []
+
+            example = fields[2]
             data[target].append([example, label])
 
     return data
@@ -89,15 +94,15 @@ def read_data_to_column_dict(data_file):
     targets, examples, labels = [], [], []
     with open(data_file, 'r') as f:
         for line in f:
-            label, target, example = line.rstrip().split()
+            fields = line.rstrip().split()
             try:
-                label = int(label)
+                label = int(fields[0])
             except ValueError:
                 label = None
 
             labels.append(label)
-            targets.append(target)
-            examples.append(example)
+            targets.append(fields[1])
+            examples.append(fields[2])
 
     return dict(labels=labels, targets=targets, examples=examples)
 
@@ -110,16 +115,16 @@ def read_scored_data_to_column_dict(data_file):
     targets, examples, labels, scores = [], [], [], []
     with open(data_file, 'r') as f:
         for line in f:
-            label, target, example, score = line.rstrip().split()
+            fields = line.rstrip().split()
             try:
-                label = int(label)
+                label = int(fields[0])
             except ValueError:
                 label = None
 
             labels.append(label)
-            targets.append(target)
-            examples.append(example)
-            scores.append(float(score))
+            targets.append(fields[1])
+            examples.append(fields[2])
+            scores.append(float(fields[3]))
 
     return dict(labels=labels, targets=targets, examples=examples, scores=scores)
 
@@ -219,9 +224,12 @@ def get_model_predictions(model_file, weight_file, data_file):
         output = model.forward()
         for j in range(batch_size):
         
-            if i*batch_size + j >= num_examples:
+            data_index = i*batch_size + j
+            if data_index >= num_examples:
                 break
 
+            if data['labels'][data_index] != int(output['label'][j]):
+                raise IndexError('file data does not match model data')
             data['scores'].append(output['pred'][j][1])
 
     return data
@@ -377,13 +385,14 @@ def generate_test_files(output_dir, test_data_file, binmap_root, model_prototype
     return test_files
 
 
-def crossval_model(output_dir, data_file, model_file, solver_file, opts):
+def crossval_model(output_dir, args):
     
-    gpus = opts.pop('-g', '0')
-    binmap_root = opts.pop('-b', DEFAULT_BINMAP_ROOT)
+    gpus = args.g or '0'
+    binmap_root = args.b or DEFAULT_BINMAP_ROOT
     k = 3
 
-    crossval_files = generate_crossval_files(output_dir, data_file, binmap_root, model_file, solver_file, k)
+    crossval_files = generate_crossval_files(output_dir, args.data_file, binmap_root, \
+        args.model_file, args.solver_file, k)
     
     for i in range(k+1):
 
@@ -406,72 +415,80 @@ def crossval_model(output_dir, data_file, model_file, solver_file, opts):
     plot_roc_curves(roc_plot_file, plot_data)
 
 
-def test_model(output_dir, data_file, model_file, weight_file, opts):
+def test_model(output_dir, args):
 
-    gpus = opts.pop('-g', '0')
-    binmap_root = opts.pop('-b', DEFAULT_BINMAP_ROOT)
+    gpus = args.g or '0'
+    binmap_root = args.b or DEFAULT_BINMAP_ROOT
     
-    test_files = generate_test_files(output_dir, data_file, binmap_root, model_file, weight_file)
+    test_files = generate_test_files(output_dir, args.data_file, binmap_root, \
+        args.model_file, args.weight_file)
     
     caffe.set_device(int(gpus[0])) 
     caffe.set_mode_gpu()
 
     test_data_file = test_files['test_data']
     test_model_file = test_files['test_model']
-    results = get_model_predictions(test_model_file, weight_file, test_data_file)
+    results = get_model_predictions(test_model_file, args.weight_file, test_data_file)
 
     score_file = test_files['score']
     write_scores_to_file(score_file, results)
 
 
 def parse_args(argv):
-    args, opts = list(), dict()
-    # first get optional args
-    opt = None
-    for i, arg in enumerate(argv):
-        if arg[0] == '-': # arg is an opt
-            if opt:
-                raise UsageError('error: option ' + opt + ' expected a value')
-            if arg == '-h':
-                raise UsageError(__doc__)
-            elif arg in ['-o', '-g', '-b']:
-                opt = arg
-            else:
-                raise UsageError('error: invalid option ' + arg)
-        elif opt: # previous arg was an opt, so this is its value
-            opts[opt] = arg
-            opt = None
-        elif i > 0: # ignore the script name
-            args.append(arg)
-    if opt:
-        raise UsageError('error: option ' + opt + ' expected a value')
-    # then assert positional args
-    if len(args) < 4:
-        raise UsageError('error: not enough arguments') 
-    if args[0] not in ['crossval', 'test']:
-        raise UsageError('error: task should be \'crossval\' or \'test\'')
-    return args, opts
+
+    p_global = argparse.ArgumentParser(add_help=False)
+    p_global.add_argument('-g', metavar='<gpus>', \
+        help='comma-separated device ids of GPUs to use')
+    p_global.add_argument('-o', metavar='<output_dir>', \
+        help='directory to output generated files')
+    p_global.add_argument('-b', metavar='<binmap_root>', \
+        help='root of binmap directory tree')
+
+    p_task = argparse.ArgumentParser(parents=[p_global])
+    subparsers = p_task.add_subparsers(title='task', metavar='<crossval|test>', \
+        help='perform cross-validation training or testing')
+    subparsers.required = True
+
+    p_crossval = subparsers.add_parser('crossval', parents=[p_global])
+    p_crossval.set_defaults(task='crossval')
+    p_crossval.add_argument('data_file', metavar='<data_file>', \
+        help='dataset for training and validation')
+    p_crossval.add_argument('model_file', metavar='<model_file>', \
+        help='model definition prototxt')
+    p_crossval.add_argument('solver_file', metavar='<solver_file>', \
+        help='solver definition prototxt')
+
+    p_test = subparsers.add_parser('test', parents=[p_global])
+    p_test.set_defaults(task='test')
+    p_test.add_argument('data_file', metavar='<data_file>', \
+        help='dataset to produce scores for')
+    p_test.add_argument('model_file', metavar='<model_file>', \
+        help='model definition prototxt')
+    p_test.add_argument('weight_file', metavar='<weight_file>', \
+        help='caffemodel to use as model weights')
+
+    return p_task.parse_args(argv[1:])
 
 
 def main(argv=sys.argv):
 
     try:
-        args, opts = parse_args(argv)
-    except UsageError as e:
-        return e.msg
+        args = parse_args(argv)
+    except SystemExit:
+        return 1
 
     try:
-        output_dir = opts.pop('-o', '.')
+        output_dir = args.o or '.'
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
     except IOError:
         return OUTPUT_DIR_ERROR
 
-    if args[0] == 'crossval':
-        crossval_model(output_dir, args[1], args[2], args[3], opts)
+    if args.task == 'crossval':
+        crossval_model(output_dir, args)
 
-    elif args[0] == 'test':
-        test_model(output_dir, args[1], args[2], args[3], opts)
+    elif args.task == 'test':
+        test_model(output_dir, args)
 
 
 if __name__ == '__main__':
