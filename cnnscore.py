@@ -14,15 +14,9 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as colormap
 
 
-OUTPUT_DIR_ERROR = 'error: could not make or access the output directory'
-GPU_BUSY_ERROR = 'error: one or more selected GPUs are unavailable'
-
 DEFAULT_BINMAP_ROOT = '/scr/DUDe/'
-
-
-class UsageError(Exception):
-    def __init__(self, msg):
-        self.msg = msg
+DEFAULT_OUTPUT_DIR = './'
+DEFAULT_GPUS = '0'
 
 
 def read_lines_from_file(file):
@@ -384,7 +378,7 @@ def crossval_model(output_dir, data_file, model_file, solver_file, opts):
     binmap_root = opts.b or DEFAULT_BINMAP_ROOT
     crossval_files = generate_crossval_files(output_dir, data_file, binmap_root, model_file, solver_file, k)
     
-    gpus = opts.g or '0'
+    gpus = opts.g or DEFAULT_GPUS
     for i in range(k+1):
         solver_file = crossval_files['solvers'][i]
         os.system('caffe train -solver ' + solver_file + ' -gpu ' + gpus)
@@ -418,7 +412,7 @@ def test_model(output_dir, data_file, model_file, weight_file, opts):
     binmap_root = opts.b or DEFAULT_BINMAP_ROOT
     test_files = generate_test_files(output_dir, data_file, binmap_root, model_file, weight_file)
     
-    gpus = opts.g or '0'
+    gpus = opts.g or DEFAULT_GPUS
     caffe.set_device(int(gpus.split(',')[0])) 
     caffe.set_mode_gpu()
     test_data_file = test_files['test_data']
@@ -468,7 +462,7 @@ def parse_args(argv):
 def main(argv=sys.argv):
 
     args = parse_args(argv)
-    output_dir = args.o or '.'
+    output_dir = args.o or DEFAULT_OUTPUT_DIR
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     if args.task == 'crossval':
