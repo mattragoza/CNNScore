@@ -24,6 +24,10 @@ def read_lines_from_file(file):
     with open(file, 'r') as f:
         return [line.rstrip().split() for line in f]
 
+def write_lines_to_file(lines, file):
+    with open(file, 'w') as f:
+        f.write('\n'.join(' '.join(map(str, line)) for line in lines))
+
 def transpose(data):
     '''Transpose the row column majority of data'''
     return [list(i) for i in zip(*data)]
@@ -34,7 +38,7 @@ def sort_by_index(data, index, reverse=False):
 
 def apply_to_fields(data, funcs):
     '''Map a list of functions to the fields in each line of data'''
-    return [map(lambda f,x: f(x), funcs, fields) for fields in data]
+    return [map(lambda (f,x): f(x), zip(funcs, fields)) for fields in data]
 
 def group_by_index(data, index):
     '''Group data lines into a dict by a field index'''
@@ -47,78 +51,36 @@ def group_by_index(data, index):
     return d
 
 
-def read_data_to_target_dict(data_file):
-    '''Read a .binmaps file into a dictionary where keys are
-    targets and values are the list of corresponding examples,
-    as [example, label].'''
+def read_data_to_target_dict(data_file, types, index):
+    '''Read data lines from file into fields with the provided types,
+    then group them into a dictionary by a field index.'''
 
     data = read_lines_from_file(data_file)
-    target_dict = dict()
-    for fields in data:
-        try:
-            label = int(fields[0])
-        except ValueError:
-            label = None
-        target = fields[1]
-        example = fields[2]
-        if target not in target_dict:
-            target_dict[target] = []
-        target_dict[target].append([example, label])
-
-    return target_dict
+    data = apply_to_fields(data, types)
+    data = group_by_index(data, index)
+    return data
 
 
-def read_data_to_column_dict(data_file):
-    '''Read a .binmaps file into a dictionary where keys are labels,
-    targets, and examples, and values are lists of corresponding data
-    in the order it appears in the file.'''
+def read_data_to_field_dict(data_file, types, fields):
+    '''Read data lines from file into fields with the provided types,
+    then transpose and group the columns into a dictionary using field
+    names as the keys.'''
 
     data = read_lines_from_file(data_file)
-    targets, examples, labels = [], [], []
-    for fields in data:
-        try:
-            label = int(fields[0])
-        except ValueError:
-            label = None
-        labels.append(label)
-        targets.append(fields[1])
-        examples.append(fields[2])
-
-    return dict(labels=labels, targets=targets, examples=examples)
+    data = apply_to_fields(data, types)
+    data = dict(zip(fields, transpose(data)))
+    return data
 
 
-def read_scored_data_to_column_dict(data_file):
-    '''Read a .scores file into a dictionary where keys are labels,
-    targets, examples, and scores, and values are lists of corresponding
-    data in the order it appears in the file.'''
-
-    targets, examples, labels, scores = [], [], [], []
-    with open(data_file, 'r') as f:
-        for line in f:
-            fields = line.rstrip().split()
-            try:
-                label = int(fields[0])
-            except ValueError:
-                label = None
-
-            labels.append(label)
-            targets.append(fields[1])
-            examples.append(fields[2])
-            scores.append(float(fields[3]))
-
-    return dict(labels=labels, targets=targets, examples=examples, scores=scores)
-
-
-def reduce_target_data(data, factor):
-    '''Creates a reduced data set by randomly sampling from the given
-    target dictioanry such that each target's number of examples has
-    been reduced by the given factor.'''
+def reduce_data(data, factor):
+    '''Creates a reduced data dict by randomly sampling from each target
+    in the given dictionary such that each targets's examples have been
+    reduced by the given factor.'''
 
     reduced = dict()
     for target in data:
         np.random.shuffle(data[target])
         reduced[target] = data[target][:len(data[target])//factor]
-
     return reduced
 
 
@@ -129,11 +91,9 @@ def k_fold_partitions(data, k):
 
     targets = list(data.keys())
     np.random.shuffle(targets)
-
     parts = [[] for i in range(k)]
     for i, target in enumerate(targets):
         parts[i%k].append(target)
-
     return parts
 
 
@@ -190,7 +150,8 @@ def write_scores_to_file(score_file, results):
 
 def get_model_predictions(model_file, weight_file, data_file):
 
-    data = read_data_to_column_dict(data_file)
+    data = read_data_to_field_dict(data_file, types=[int, str, str], \
+        fields=['labels', 'targets', 'examples'])
     data['scores'] = []
     
     model = caffe.Net(model_file, weight_file, caffe.TEST)
