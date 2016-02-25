@@ -108,7 +108,7 @@ def write_target_data_to_file(data_file, data, targets=None):
     lines = []
     for target in targets:
         for example in data[target]:
-            lines.append(str(example[1]) + ' ' + target + ' ' + example[0])
+            lines.append(str(example[0]) + ' ' + target + ' ' + example[1])
 
     np.random.shuffle(lines)
 
@@ -192,6 +192,7 @@ def write_model_prototxt(model_file, model_prototype, data_file, binmap_root, mo
     if mode == 'train':
         data_layer.ndim_data_param.shuffle = True
         data_layer.ndim_data_param.balanced = True
+        data_layer.ndim_data_param.rotate = 10
         for i, layer in enumerate(model.layer):
             if layer.name == 'pred':
                 model.layer.pop(i)
