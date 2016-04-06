@@ -9,8 +9,8 @@ import numpy as np
 import caffe
 from caffe.proto import caffe_pb2
 from google import protobuf as pb
-from sklearn.metrics import roc_curve, auc
 
+from sklearn.metrics import roc_curve, auc
 import matplotlib.pyplot as plt
 import matplotlib.cm as colormap
 
@@ -39,7 +39,7 @@ def sort_by_index(data, index, reverse=False):
 
 def apply_to_fields(data, funcs):
     '''Map a list of functions to the fields in each line of data'''
-    return [map(lambda (f,x): f(x), zip(funcs, fields)) for fields in data]
+    return [map(lambda f,x: f(x), zip(funcs, fields)) for fields in data]
 
 def group_by_index(data, index):
     '''Group data lines into a dict by a field index'''
@@ -459,16 +459,17 @@ def draw_crossval_plots(output_dir, data_file, model_file, solver_file, opts, lo
 
 
 
-def crossval_model(output_dir, data_file, model_file, solver_file, opts):
+def crossval_model(output_dir, data_file, model_file, solver_file, opts, train=True):
 
     k = 3
     binmap_root = opts.b or DEFAULT_BINMAP_ROOT
     crossval_files = generate_crossval_files(output_dir, data_file, binmap_root, model_file, solver_file, k, write=True)
     
     gpus = opts.g or DEFAULT_GPUS
-    for i in range(k+1):
-        solver_file = crossval_files['solvers'][i]
-        os.system('caffe train -solver ' + solver_file + ' -gpu ' + gpus)
+    if train:
+        for i in range(k+1):
+            solver_file = crossval_files['solvers'][i]
+            os.system('caffe train -solver ' + solver_file + ' -gpu ' + gpus)
 
     caffe.set_device(int(gpus.split(',')[0])) # can pycaffe do multi-gpu?
     caffe.set_mode_gpu()
