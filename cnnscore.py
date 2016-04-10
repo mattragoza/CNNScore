@@ -138,7 +138,7 @@ class CNNScoreModel:
 
 
     def train(self, data_file, data_root, k=3, base_lr=0.001, momentum=0.9,
-        weight_decay=0.001, max_iter=20000, output_dir='./', gpus=[0,1],
+        weight_decay=0.001, max_iter=20000, output_dir='./', gpus=None,
         snapshot=1000):
         '''
         Train the model with a dataset using optional training parameters,
@@ -203,12 +203,16 @@ class CNNScoreModel:
                 f.write(str(solver))
 
             # call Caffe executable to start training
-            os.system('caffe train -solver ' + solver_file + ' -gpu ' + 
-                ','.join(map(str, gpus)) )
+            command = 'caffe train -solver ' + solver_file
+            if gpus:
+                command += ' -gpu ' + ','.join(map(str, gpus))
+            os.system(command)
 
+        if gpus:
+            caffe.set_device(gpus[0])
+            caffe.set_mode_gpu()
+            
         # TEST PHASE
-        caffe.set_device(gpus[0])
-        caffe.set_mode_gpu()
         all_scored_data = [[], []]
         for i in range(k+1):
 
@@ -253,7 +257,7 @@ class CNNScoreModel:
         return all_scored_data
 
 
-    def test(self, data_file, data_root, weight_file, gpus=[0,1]):
+    def test(self, data_file, data_root, weight_file, gpus=None):
         '''
         Test the model on a dataset using pretrained weights.
         '''

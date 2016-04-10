@@ -37,7 +37,7 @@ def parse_args(argv):
     parser.add_argument('-s', '--snapshot', type=int, default=1000,
         help='period of iterations to save weights')
     
-    parser.add_argument('-g', '--gpus', type=str, default='0',
+    parser.add_argument('-g', '--gpus', type=str, default=None,
         help='device IDs of GPUs for Caffe to use')
 
     parser.add_argument('-o', '--output', type=str, default='./',
@@ -62,9 +62,14 @@ def main(argv=sys.argv):
     model = cnnscore.CNNScoreModel(args.model, n_units, n_conv_per_unit, n_filters,
         downsample=args.downsample)
 
+    if args.gpus:
+        gpus = map(int, args.gpus.split(','))
+    else:
+        gpus = None
+
     all_scored_data = model.train(args.data, args.data_root,
         k=args.kfolds,
-        gpus=map(int, args.gpus.split(',')),
+        gpus=gpus,
         base_lr=args.baselr,
         momentum=args.momentum,
         weight_decay=args.weightdecay,
