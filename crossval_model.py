@@ -10,11 +10,14 @@ def parse_args(argv):
     parser.add_argument('-d', '--data', type=str, required=True,
         help='.binmaps file for training and validation')
 
-    parser.add_argument('-r', '--data_root', type=str, required=True,
+    parser.add_argument('-r', '--data_root', type=str, default='/scr/CSAR/',
         help='root directory of .binmap data')
 
     parser.add_argument('-m', '--model', type=str, required=True,
-        help='Caffe model definition .prototxt file')
+        help='model topology specification')
+
+    parser.add_argument('-p', '--downsample', type=str, default='pool',
+        help='downsampling method, pool or conv')
 
     parser.add_argument('-k', '--kfolds', type=int, default=3,
         help='number of folds for k-fold cross-validation')
@@ -22,7 +25,7 @@ def parse_args(argv):
     parser.add_argument('-l', '--baselr', type=float, default=0.001,
         help='initial learning rate')
 
-    parser.add_argument('-a', '--momentum', type=float, default=0.09,
+    parser.add_argument('-a', '--momentum', type=float, default=0.9,
         help='learning rate momentum')
 
     parser.add_argument('-w', '--weightdecay', type=float, default=0.001,
@@ -38,7 +41,7 @@ def parse_args(argv):
         help='device IDs of GPUs for Caffe to use')
 
     parser.add_argument('-o', '--output', type=str, default='./',
-        help='directory to put output files')
+        help='directory to write output files')
 
     parser.add_argument('-f', '--force', action='store_true', default=False,
         help='force output to directory if it already exists')
@@ -55,7 +58,10 @@ def main(argv=sys.argv):
     elif not args.force:
         sys.exit('warning: output dir already exists, use -f to output there anyway')
 
-    model = cnnscore.CNNScoreModel(args.model)
+    n_units, n_conv_per_unit, n_filters = map(int, args.model.split('x'))
+    model = cnnscore.CNNScoreModel(args.model, n_units, n_conv_per_unit, n_filters,
+        downsample=args.downsample)
+
     all_scored_data = model.train(args.data, args.data_root,
         k=args.kfolds,
         gpus=map(int, args.gpus.split(',')),
@@ -70,7 +76,7 @@ def main(argv=sys.argv):
         [model.param, 'testontrain'], '.roc.png')
     cv_plot_file = cnnscore.join_filename_params(args.output, 
         [model.param, 'crossval'], '.roc.png')
-    
+
     cnnscore.plot_roc_curves(tot_plot_file, all_scored_data[0])
     cnnscore.plot_roc_curves(cv_plot_file, all_scored_data[1])
 

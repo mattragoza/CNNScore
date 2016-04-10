@@ -7,7 +7,7 @@ import numpy as np
 import pandas
 import caffe
 from caffe.proto import caffe_pb2
-from google import protobuf as pb
+from google import protobuf
 from sklearn.metrics import roc_curve, auc
 import matplotlib.pyplot as plt
 import matplotlib.cm as colormap
@@ -15,16 +15,94 @@ import matplotlib.cm as colormap
 
 class CNNScoreModel:
 
-    def __init__(self, model_file):
+    def __init__(self, param, n_units, n_conv_per_unit, n_filters,
+        batch_size=10, rotate=24, downsample='pool'):
+        '''
+        Construct a base CNN model made up of n_units layer units. Each unit
+        is a series of n_conv_per_unit convolution layers and ReLUs with the
+        same number of filters, starting at n_filters.
 
-        self.param = os.path.basename(model_file).split('.')[0]
+        If the downsample argument is "conv" or "pool", 2x downsampling is
+        applied between each unit and the number of filters doubles per unit.
+        '''
+        self.param = param
         self.model = caffe_pb2.NetParameter()
-        with open(model_file, 'r') as f:
-            pb.text_format.Merge(f.read(), self.model)
 
-        # "abstract" the base model by detaching data source
-        self.model.layer[0].ndim_data_param.source = 'SOURCE'
-        self.model.layer[0].ndim_data_param.root_folder = 'ROOT_FOLDER'
+        # data layer
+        data_layer = self.model.layer.add()
+        data_layer.name = 'data'
+        data_layer.type = 'NDimData'
+        data_layer.top.append('data')
+        data_layer.top.append('label')
+        data_layer.ndim_data_param.batch_size = batch_size
+        data_layer.ndim_data_param.shape.dim.extend([34, 49, 49, 49])
+        data_layer.ndim_data_param.shuffle = True
+        data_layer.ndim_data_param.balanced = True
+        data_layer.ndim_data_param.rotate = rotate
+        curr_top = 'data'
+
+        for i in range(n_units):
+            for j in range(n_conv_per_unit):
+
+                conv_param = 'conv' + str(i+1) + '_' + str(j+1)
+                conv_layer = self.model.layer.add()
+                conv_layer.name = conv_param
+                conv_layer.type = 'Convolution'
+                conv_layer.bottom.append(curr_top)
+                conv_layer.top.append(conv_param)
+                conv_layer.convolution_param.kernel_size.append(3)
+                conv_layer.convolution_param.pad.append(1)
+                if downsample == 'conv' and i > 0 and j == 0:
+                    conv_layer.convolution_param.stride.append(2)
+                    n_filters *= 2
+                else:
+                    conv_layer.convolution_param.stride.append(1)
+                conv_layer.convolution_param.num_output = n_filters
+                conv_layer.convolution_param.weight_filler.type = 'xavier'
+                curr_top = conv_layer.top[0]
+
+                relu_layer = self.model.layer.add()
+                relu_layer.name = conv_param + '_relu'
+                relu_layer.type = 'ReLU'
+                relu_layer.bottom.append(curr_top)
+                relu_layer.top.append(conv_param) # in-place
+                curr_top = relu_layer.top[0]
+
+            if downsample == 'pool' and i+1 < n_units:
+
+                pool_layer = self.model.layer.add()
+                pool_layer.name = conv_param + '_pool'
+                pool_layer.type = 'Pooling'
+                pool_layer.bottom.append(curr_top)
+                pool_layer.top.append(conv_param + '_pool')
+                pool_layer.pooling_param.pool = pool_layer.pooling_param.MAX
+                pool_layer.pooling_param.kernel_size.append(2)
+                pool_layer.pooling_param.stride.append(2)
+                curr_top = pool_layer.top[0]
+                n_filters *= 2
+
+        # fully connected layer to 2 output classes
+        fc_layer = self.model.layer.add()
+        fc_layer.name = 'fc'
+        fc_layer.type = 'InnerProduct'
+        fc_layer.bottom.append(curr_top)
+        fc_layer.top.append('fc')
+        fc_layer.inner_product_param.num_output = 2
+        fc_layer.inner_product_param.weight_filler.type = 'xavier'
+
+        # prediction and loss layers
+        pred_layer = self.model.layer.add()
+        pred_layer.name = 'pred'
+        pred_layer.type = 'Softmax'
+        pred_layer.bottom.append('fc')
+        pred_layer.top.append('pred')
+
+        loss_layer = self.model.layer.add()
+        loss_layer.name = 'loss'
+        loss_layer.type = 'SoftmaxWithLoss'
+        loss_layer.bottom.append('fc')
+        loss_layer.bottom.append('label')
+        loss_layer.top.append('loss')
 
 
     def get_instance(self, data_file, data_root, phase):
@@ -64,8 +142,8 @@ class CNNScoreModel:
         snapshot=1000):
         '''
         Train the model with a dataset using optional training parameters,
-        taking a weight snapshot at every 1000 iterations. Then the model
-        is validated using each set of weights.
+        taking a weight snapshot at every 1000 iterations. Then validate
+        the model using saved weights from every snapshot iteration.
 
         If k is greater than 1, k-fold cross-validation is performed. First
         the model is trained and tested on the entire dataset, then k more
@@ -120,7 +198,7 @@ class CNNScoreModel:
             solver.snapshot_prefix = join_filename_params(output_dir,
                 [self.param, part_params[i]], '')
             solver_file = join_filename_params(output_dir,
-                [self.param, part_params[i], 'train'], '.solver.prototxt')
+                [self.param, part_params[i]], '.solver.prototxt')
             with open(solver_file, 'w') as f:
                 f.write(str(solver))
 
@@ -154,7 +232,7 @@ class CNNScoreModel:
                 weight_file = join_filename_params(output_dir,
                     [self.param, part_params[i], iter_param], '.caffemodel')
                 score_file = join_filename_params(output_dir,
-                    [self.param, part_params[i], iter_param], '.scores')            
+                    [self.param, part_params[i], iter_param], '.scores')
 
                 scored_data = get_caffe_model_predictions(test_model_file,
                     weight_file)
@@ -169,7 +247,8 @@ class CNNScoreModel:
                     all_scored_data[1].append(scored_data)
                 else:
                     all_scored_data[1][j].append(scored_data)
-                    all_scored_data[1][j].name = self.param+'_'+iter_param+'_crossval'
+                    all_scored_data[1][j].name = \
+                        self.param+'_'+iter_param+'_crossval'
 
         return all_scored_data
 
@@ -210,7 +289,7 @@ def get_caffe_model_predictions(model_file, weight_file):
     # read test data from model data layer into a data frame
     model = caffe_pb2.NetParameter()
     with open(model_file, 'r') as f:
-        pb.text_format.Merge(f.read(), model)
+        protobuf.text_format.Merge(f.read(), model)
     data_file = model.layer[0].ndim_data_param.source
     data = pandas.read_csv(data_file, header=None, sep=' ',
         names=['label', 'target', 'example'], usecols=range(3))
