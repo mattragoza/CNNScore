@@ -16,14 +16,24 @@ import matplotlib.cm as colormap
 class CNNScoreModel:
 
     def __init__(self, param, n_units, n_conv_per_unit, n_filters,
-        batch_size=10, rotate=24, downsample='pool', residual=False):
+        batch_size=10, rotate=24, downsample='max_pool', shortcuts=False,
+        class_maps=False):
         '''
         Construct a base CNN model made up of n_units layer units. Each unit
         is a series of n_conv_per_unit convolution layers and ReLUs with the
         same number of filters, starting at n_filters.
 
-        If the downsample argument is "conv" or "pool", 2x downsampling is
-        applied between each unit and the number of filters doubles per unit.
+        If the downsample argument is "conv_stride" or "max_pool", 2x downsampling
+        is applied between each unit and the number of filters doubles per unit.
+
+        If shortcuts is set, shortcut connections are added between the bottom
+        and top of each unit and combined with the unit output by element-wise
+        addition to allow residual learning.
+
+        If class_maps is set, intead of using a fully connected layer to produce
+        2 output classes a 1x1 convolutional layer reduces the number of feature
+        maps at the top of the network to 2 output class maps followed by global
+        average pooling.
         '''
         self.param = param
         self.model = caffe_pb2.NetParameter()
@@ -53,7 +63,7 @@ class CNNScoreModel:
                 conv_layer.top.append(conv_param)
                 conv_layer.convolution_param.kernel_size.append(3)
                 conv_layer.convolution_param.pad.append(1)
-                if downsample == 'conv' and i > 0 and j == 0:
+                if downsample == 'conv_stride' and i > 0 and j == 0:
                     conv_layer.convolution_param.stride.append(2)
                     n_filters *= 2
                 else:
@@ -66,10 +76,10 @@ class CNNScoreModel:
                 relu_layer.name = conv_param + '_relu'
                 relu_layer.type = 'ReLU'
                 relu_layer.bottom.append(curr_top)
-                relu_layer.top.append(conv_param) # in-place
+                relu_layer.top.append(curr_top) # in-place
                 curr_top = relu_layer.top[0]
 
-            if residual:
+            if shortcuts:
 
                 res_layer = self.model.layer.add()
                 res_layer.name = 'res' + str(i+1)
@@ -80,7 +90,7 @@ class CNNScoreModel:
                 res_layer.eltwise_param.operation = res_layer.eltwise_param.SUM
                 curr_top = res_layer.top[0]
 
-            if downsample == 'pool' and i+1 < n_units:
+            if downsample == 'max_pool' and i+1 < n_units:
 
                 pool_layer = self.model.layer.add()
                 pool_layer.name = conv_param + '_pool'
@@ -93,26 +103,53 @@ class CNNScoreModel:
                 curr_top = pool_layer.top[0]
                 n_filters *= 2
 
-        # fully connected layer to 2 output classes
-        fc_layer = self.model.layer.add()
-        fc_layer.name = 'fc'
-        fc_layer.type = 'InnerProduct'
-        fc_layer.bottom.append(curr_top)
-        fc_layer.top.append('fc')
-        fc_layer.inner_product_param.num_output = 2
-        fc_layer.inner_product_param.weight_filler.type = 'xavier'
+        if class_maps:
+
+            # reduce feature maps to 2 output class maps, then take global average
+            conv_layer = self.model.layer.add()
+            conv_layer.name = 'conv_out'
+            conv_layer.type = 'Convolution'
+            conv_layer.bottom.append(curr_top)
+            conv_layer.top.append('conv_out')
+            conv_layer.convolution_param.kernel_size.append(1)
+            conv_layer.convolution_param.pad.append(0)
+            conv_layer.convolution_param.stride.append(1)
+            conv_layer.convolution_param.num_output = 2
+            conv_layer.convolution_param.weight_filler.type = 'xavier'
+            curr_top = conv_layer.top[0]
+
+            pool_layer = self.model.layer.add()
+            pool_layer.name = 'pool_out'
+            pool_layer.type = 'Pooling'
+            pool_layer.bottom.append(curr_top)
+            pool_layer.top.append('pool_out')
+            pool_layer.pooling_param.global_pooling = True
+            pool_layer.pooling_param.pool = pool_layer.pooling_param.AVE
+            curr_top = pool_layer.top[0]
+
+        else:
+
+            # fully connect feature maps to 2 output classes
+            fc_layer = self.model.layer.add()
+            fc_layer.name = 'fc_out'
+            fc_layer.type = 'InnerProduct'
+            fc_layer.bottom.append(curr_top)
+            fc_layer.top.append('fc_out')
+            fc_layer.inner_product_param.num_output = 2
+            fc_layer.inner_product_param.weight_filler.type = 'xavier'
+            curr_top = fc_layer.top[0]
 
         # prediction and loss layers
         pred_layer = self.model.layer.add()
         pred_layer.name = 'pred'
         pred_layer.type = 'Softmax'
-        pred_layer.bottom.append('fc')
+        pred_layer.bottom.append(curr_top)
         pred_layer.top.append('pred')
 
         loss_layer = self.model.layer.add()
         loss_layer.name = 'loss'
         loss_layer.type = 'SoftmaxWithLoss'
-        loss_layer.bottom.append('fc')
+        loss_layer.bottom.append(curr_top)
         loss_layer.bottom.append('label')
         loss_layer.top.append('loss')
 
