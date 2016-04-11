@@ -16,7 +16,7 @@ import matplotlib.cm as colormap
 class CNNScoreModel:
 
     def __init__(self, param, n_units, n_conv_per_unit, n_filters,
-        batch_size=10, rotate=24, downsample='pool'):
+        batch_size=10, rotate=24, downsample='pool', residual=False):
         '''
         Construct a base CNN model made up of n_units layer units. Each unit
         is a series of n_conv_per_unit convolution layers and ReLUs with the
@@ -42,6 +42,7 @@ class CNNScoreModel:
         curr_top = 'data'
 
         for i in range(n_units):
+            unit_bottom = curr_top
             for j in range(n_conv_per_unit):
 
                 conv_param = 'conv' + str(i+1) + '_' + str(j+1)
@@ -67,6 +68,17 @@ class CNNScoreModel:
                 relu_layer.bottom.append(curr_top)
                 relu_layer.top.append(conv_param) # in-place
                 curr_top = relu_layer.top[0]
+
+            if residual:
+
+                res_layer = self.model.layer.add()
+                res_layer.name = 'res' + str(i+1)
+                res_layer.type = 'Eltwise'
+                res_layer.bottom.append(unit_bottom)
+                res_layer.bottom.append(curr_top)
+                res_layer.top.append('res' + str(i+1))
+                res_layer.eltwise_param.operation = res_layer.eltwise_param.SUM
+                curr_top = res_layer.top[0]
 
             if downsample == 'pool' and i+1 < n_units:
 
