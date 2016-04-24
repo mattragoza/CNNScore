@@ -10,14 +10,17 @@ def parse_args(argv):
     parser.add_argument('-d', '--data', type=str, required=True,
         help='.binmaps file for training and validation')
 
-    parser.add_argument('-r', '--data_root', type=str, default='/scr/CSAR/',
+    parser.add_argument('-r', '--data_root', type=str, default='/net/pulsar/home/koes/dkoes/CSAR/',
         help='root directory of .binmap data')
 
     parser.add_argument('-m', '--model', type=str, required=True,
         help='model topology specification')
 
-    parser.add_argument('-p', '--downsample', type=str, default='pool',
+    parser.add_argument('-p', '--downsample', type=str, default='max_pool',
         help='downsampling method, pool or conv')
+
+    parser.add_argument('-e', '--residual', action='store_true', default=False,
+        help='use residual learning')
 
     parser.add_argument('-k', '--kfolds', type=int, default=3,
         help='number of folds for k-fold cross-validation')
@@ -60,7 +63,7 @@ def main(argv=sys.argv):
 
     n_units, n_conv_per_unit, n_filters = map(int, args.model.split('x'))
     model = cnnscore.CNNScoreModel(args.model, n_units, n_conv_per_unit, n_filters,
-        downsample=args.downsample)
+        downsample=args.downsample, residuals=args.residual)
 
     if args.gpus:
         gpus = map(int, args.gpus.split(','))
