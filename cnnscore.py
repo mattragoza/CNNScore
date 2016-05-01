@@ -15,31 +15,46 @@ import matplotlib.cm as colormap
 
 class CNNScoreModel:
 
-    def __init__(self, param, n_units, n_conv_per_unit, n_filters,
-        batch_size=10, rotate=24, downsample='max_pool', residuals=False,
-        class_maps=False):
+    def __init__(self, n_units, n_conv_per_unit, n_filters, batch_size=10,
+                 rotate=24, pool=True, residual=False):
         '''
         Construct a base CNN model made up of n_units layer units. Each unit
         is a series of n_conv_per_unit convolution layers and ReLUs with the
         same number of filters, starting at n_filters.
 
-        If the downsample argument is "conv_stride" or "max_pool", 2x downsampling
-        is applied between each unit and the number of filters doubles per unit.
+        If downsample is set, 2x max pooling is applied between each unit and
+        the number of filters doubles per unit.
 
-        If shortcuts is set, shortcut connections are added between the bottom
-        and top of each unit and combined with the unit output by element-wise
-        addition to allow residual learning.
-
-        If class_maps is set, intead of using a fully connected layer to produce
-        2 output classes a 1x1 convolutional layer reduces the number of feature
-        maps at the top of the network to 2 output class maps followed by global
-        average pooling.
+        If residual is set, additive connections are included between the
+        bottom and top of each unit to allow residual learning.
         '''
-        self.param = param
-        self.model = caffe_pb2.NetParameter()
+        self.name = '{}x{}x{}'.format(n_units, n_conv_per_unit, n_filters)
+        self.proto = caffe_pb2.NetParameter()
 
-        # data layer
-        data_layer = self.model.layer.add()
+        # data layer and initial downsampling convolution
+        data, label = self._add_data_layer(batch_size, rotate)
+        top = self._add_conv_layer(data, 'down_conv', n_filters, stride=2)
+        n_filters *= 2
+
+        # customizable convolution units
+        for i in range(n_units):
+            unit_name = 'unit{}'.format(i+1)
+            top = self._add_unit(top, unit_name, n_conv_per_unit, n_filters,
+                                 residual)
+            if pool:
+                pool_name = 'pool{}'.format(i+1)
+                top = self._add_pool_layer(top, pool_name)
+                n_filters *= 2
+
+        # final fully connected layer and softmax prediction and loss
+        top = self._add_fc_layer(top, 'fc', 2)
+        self._add_pred_layer(top)
+        self._add_loss_layer(top, label)
+
+
+    def _add_data_layer(self, batch_size, rotate):
+
+        data_layer = self.proto.layer.add()
         data_layer.name = 'data'
         data_layer.type = 'NDimData'
         data_layer.top.append('data')
@@ -49,121 +64,112 @@ class CNNScoreModel:
         data_layer.ndim_data_param.balanced = True
         data_layer.ndim_data_param.shuffle = True
         data_layer.ndim_data_param.rotate = rotate
-        curr_top = 'data'
+        self.xyz = 49
+        return 'data', 'label'
 
-        for i in range(n_units):
+    def _add_conv_layer(self, bottom, top, n_filters, kernel=3, pad=1, stride=1):
 
-            unit_bottom = curr_top
-            unit_param = 'unit' + str(i+1)
+        new_xyz = (self.xyz + 2*pad - kernel)/stride + 1
+        assert new_xyz > 0
+        self.xyz = new_xyz
 
-            for j in range(n_conv_per_unit):
+        conv_layer = self.proto.layer.add()
+        conv_layer.name = top
+        conv_layer.type = 'Convolution'
+        conv_layer.bottom.append(bottom)
+        conv_layer.top.append(top)
+        conv_layer.convolution_param.kernel_size.append(kernel)
+        conv_layer.convolution_param.pad.append(1)
+        conv_layer.convolution_param.stride.append(stride)
+        conv_layer.convolution_param.num_output = n_filters
+        conv_layer.convolution_param.weight_filler.type = 'xavier'
+        return top
 
-                conv_name = unit_param + '_conv' + str(j+1)
-                conv_layer = self.model.layer.add()
-                conv_layer.name = conv_name
-                conv_layer.type = 'Convolution'
-                conv_layer.bottom.append(curr_top)
-                conv_layer.top.append(conv_name)
-                conv_layer.convolution_param.kernel_size.append(3)
-                conv_layer.convolution_param.pad.append(1)
-                if downsample == 'conv_stride' and i > 0 and j == 0:
-                    conv_layer.convolution_param.stride.append(2)
-                    n_filters *= 2
-                else:
-                    conv_layer.convolution_param.stride.append(1)
-                conv_layer.convolution_param.num_output = n_filters
-                conv_layer.convolution_param.weight_filler.type = 'xavier'
-                curr_top = conv_layer.top[0]
+    def _add_relu_layer(self, bottom, top):
 
-                relu_name = unit_param + '_relu' + str(j+1)
-                relu_layer = self.model.layer.add()
-                relu_layer.name = relu_name
-                relu_layer.type = 'ReLU'
-                relu_layer.bottom.append(curr_top)
-                relu_layer.top.append(curr_top) # in-place
-                curr_top = relu_layer.top[0]
+        relu_layer = self.proto.layer.add()
+        relu_layer.name = top
+        relu_layer.type = 'ReLU'
+        relu_layer.bottom.append(bottom)
+        relu_layer.top.append(bottom) # in-place
+        return bottom
 
-            if residuals:
+    def _add_res_layer(self, bottom1, bottom2, top):
 
-                res_name = unit_param + '_res'
-                res_layer = self.model.layer.add()
-                res_layer.name = res_name
-                res_layer.type = 'Eltwise'
-                res_layer.bottom.append(unit_bottom)
-                res_layer.bottom.append(curr_top)
-                res_layer.top.append(res_name)
-                res_layer.eltwise_param.operation = res_layer.eltwise_param.SUM
-                curr_top = res_layer.top[0]
+        res_layer = self.proto.layer.add()
+        res_layer.name = top
+        res_layer.type = 'Eltwise'
+        res_layer.bottom.append(bottom1)
+        res_layer.bottom.append(bottom2)
+        res_layer.top.append(top)
+        res_layer.eltwise_param.operation = res_layer.eltwise_param.SUM
+        return top
 
-            if downsample == 'max_pool' and i+1 < n_units:
+    def _add_pool_layer(self, bottom, top):
 
-                pool_name = unit_param + '_pool'
-                pool_layer = self.model.layer.add()
-                pool_layer.name = pool_name
-                pool_layer.type = 'Pooling'
-                pool_layer.bottom.append(curr_top)
-                pool_layer.top.append(pool_name)
-                pool_layer.pooling_param.pool = pool_layer.pooling_param.MAX
-                pool_layer.pooling_param.kernel_size.append(2)
-                pool_layer.pooling_param.stride.append(2)
-                curr_top = pool_layer.top[0]
-                n_filters *= 2
+        new_xyz = (self.xyz + 2*0 - 2)/2 + 1
+        assert new_xyz > 0
+        self.xyz = new_xyz
 
-        if class_maps:
+        pool_layer = self.proto.layer.add()
+        pool_layer.name = top
+        pool_layer.type = 'Pooling'
+        pool_layer.bottom.append(bottom)
+        pool_layer.top.append(top)
+        pool_layer.pooling_param.pool = pool_layer.pooling_param.MAX
+        pool_layer.pooling_param.kernel_size.append(2)
+        pool_layer.pooling_param.pad.append(0)
+        pool_layer.pooling_param.stride.append(2)
+        return top
 
-            # reduce feature maps to 2 output class maps, then take global average
-            conv_name = 'output_conv'
-            conv_layer = self.model.layer.add()
-            conv_layer.name = conv_name
-            conv_layer.type = 'Convolution'
-            conv_layer.bottom.append(curr_top)
-            conv_layer.top.append(conv_name)
-            conv_layer.convolution_param.kernel_size.append(1)
-            conv_layer.convolution_param.pad.append(0)
-            conv_layer.convolution_param.stride.append(1)
-            conv_layer.convolution_param.num_output = 2
-            conv_layer.convolution_param.weight_filler.type = 'xavier'
-            curr_top = conv_layer.top[0]
+    def _add_fc_layer(self, bottom, top, n_output):
 
-            pool_name = 'output_pool'
-            pool_layer = self.model.layer.add()
-            pool_layer.name = pool_name
-            pool_layer.type = 'Pooling'
-            pool_layer.bottom.append(curr_top)
-            pool_layer.top.append(pool_name)
-            pool_layer.pooling_param.global_pooling = True
-            pool_layer.pooling_param.pool = pool_layer.pooling_param.AVE
-            curr_top = pool_layer.top[0]
+        fc_layer = self.proto.layer.add()
+        fc_layer.name = top
+        fc_layer.type = 'InnerProduct'
+        fc_layer.bottom.append(bottom)
+        fc_layer.top.append(top)
+        fc_layer.inner_product_param.num_output = n_output
+        fc_layer.inner_product_param.weight_filler.type = 'xavier'
+        return top
 
-        else:
+    def _add_pred_layer(self, bottom):
 
-            # fully connect feature maps to 2 output classes
-            fc_name = 'output_fc'
-            fc_layer = self.model.layer.add()
-            fc_layer.name = fc_name
-            fc_layer.type = 'InnerProduct'
-            fc_layer.bottom.append(curr_top)
-            fc_layer.top.append(fc_name)
-            fc_layer.inner_product_param.num_output = 2
-            fc_layer.inner_product_param.weight_filler.type = 'xavier'
-            curr_top = fc_layer.top[0]
-
-        # prediction and loss layers
-        pred_layer = self.model.layer.add()
+        pred_layer = self.proto.layer.add()
         pred_layer.name = 'pred'
         pred_layer.type = 'Softmax'
-        pred_layer.bottom.append(curr_top)
+        pred_layer.bottom.append(bottom)
         pred_layer.top.append('pred')
+        return 'pred'
 
-        loss_layer = self.model.layer.add()
+    def _add_loss_layer(self, bottom1, bottom2):
+
+        loss_layer = self.proto.layer.add()
         loss_layer.name = 'loss'
         loss_layer.type = 'SoftmaxWithLoss'
-        loss_layer.bottom.append(curr_top)
-        loss_layer.bottom.append('label')
+        loss_layer.bottom.append(bottom1)
+        loss_layer.bottom.append(bottom2)
         loss_layer.top.append('loss')
+        return 'loss'
+
+    def _add_unit(self, bottom, unit_name, n_conv, n_filters, resid=False):
+
+        top = bottom
+        for i in range(n_conv):
+            conv_name = unit_name + '_conv{}'.format(i+1)
+            top = self._add_conv_layer(top, conv_name, n_filters)
+
+            relu_name = unit_name + '_relu{}'.format(i+1)
+            top = self._add_relu_layer(top, relu_name)
+
+        if resid:
+            res_name = unit_name + '_resid'
+            top = self._add_res_layer(bottom, top, res_name)
+
+        return top
 
 
-    def get_instance(self, data_file, data_root, phase):
+    def _get_instance(self, data_file, data_root, phase):
         '''
         Make a copy of the model protobuf that has the data source and root
         replaced in the data layer and other changes made according to the
@@ -174,29 +180,29 @@ class CNNScoreModel:
         For testing, the loss layer is removed, and the data shuffling and
         balancing options are turned off.
         '''
-        model = caffe_pb2.NetParameter()
-        model.CopyFrom(self.model)
-        model.layer[0].ndim_data_param.source = data_file
-        model.layer[0].ndim_data_param.root_folder = data_root
+        proto = caffe_pb2.NetParameter()
+        proto.CopyFrom(self.proto)
+        proto.layer[0].ndim_data_param.source = data_file
+        proto.layer[0].ndim_data_param.root_folder = data_root
 
         if phase == 'train':
-            for i, layer in enumerate(model.layer):
+            for i, layer in enumerate(proto.layer):
                 if layer.name == 'pred':
-                    del model.layer[i]
+                    del proto.layer[i]
         elif phase == 'test':
-            for i, layer in enumerate(model.layer):
+            for i, layer in enumerate(proto.layer):
                 if layer.name == 'loss':
-                    del model.layer[i]
-            model.layer[0].ndim_data_param.shuffle = False
-            model.layer[0].ndim_data_param.balanced = False
+                    del proto.layer[i]
+            proto.layer[0].ndim_data_param.shuffle = False
+            proto.layer[0].ndim_data_param.balanced = False
         else:
             raise ValueError('phase must be train or test')
 
-        return model
+        return proto
 
 
     def train(self, data_file, data_root, k=3, base_lr=0.001, momentum=0.9,
-        weight_decay=0.001, max_iter=20000, output_dir='./', gpus=None,
+        weight_decay=0.0001, max_iter=20000, output_dir='./', gpus=None,
         snapshot=1000):
         '''
         Train the model with a dataset using optional training parameters,
@@ -247,7 +253,7 @@ class CNNScoreModel:
             # get training model instance and write the model file
             train_model_file = join_filename_params(output_dir,
                 [self.param, part_params[i], 'train'], '.model.prototxt')
-            train_model = self.get_instance(train_data_file, data_root, 'train')
+            train_model = self._get_instance(train_data_file, data_root, 'train')
             with open(train_model_file, 'w') as f:
                 f.write(str(train_model))
 
@@ -282,7 +288,7 @@ class CNNScoreModel:
                     [data_param, part_params[i], 'test'], data_ext)
 
             # get test model insance and write to model file
-            test_model = self.get_instance(test_data_file, data_root, 'test')
+            test_model = self._get_instance(test_data_file, data_root, 'test')
             test_model_file = join_filename_params(output_dir,
                 [self.param, part_params[i], 'test'], '.model.prototxt')
             with open(test_model_file, 'w') as f:
@@ -323,7 +329,7 @@ class CNNScoreModel:
         data_param, data_ext = os.path.splitext(os.path.basename(data_file))
 
         # get test model instance and write to model file
-        test_model = self.get_instance(data_file, data_root, 'test')
+        test_model = self._get_instance(data_file, data_root, 'test')
         test_model_file = join_filename_params(output_dir,
             [self.param, data_param], '.model.prototxt')
         with open(test_model_file, 'w') as f:
